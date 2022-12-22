@@ -1,0 +1,20 @@
+[package]
+name = "fluid-sense"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+glam = { version = "0.21", features = ["bytemuck"] }
+winit = "0.26"
+env_logger = "0.9"
+log = "0.4"
+wgpu = "0.13.1"
+tokio = { version = "1.19.1", features = [ "full" ] }
+bytemuck = { version = "1.4", features = [ "derive" ] }
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"]}
+tobj = { version = "3.2.3", features = [ "async" ] }
+#egui = { git = "https://github.com/emilk/egui" }
+#egui-wgpu = { git = "https://github.com/emilk/egui", features = ["winit"] }
+#egui-winit = { git = "https://github.com/emilk/egui" }
