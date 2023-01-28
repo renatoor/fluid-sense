@@ -211,7 +211,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn render_fn<T>(&self, app: &T) -> Result<(), wgpu::SurfaceError>
+    pub fn render_fn<T>(&self, app: &mut T) -> Result<(), wgpu::SurfaceError>
     where
         T: App,
     {

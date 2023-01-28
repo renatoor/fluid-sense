@@ -1,6 +1,7 @@
 extern crate core;
 
 use crate::app::App;
+use crate::cfd::sph::simulation::{ParticleConfig, SimulationParticle, SPH};
 use crate::gfx::buffer::VertexBuffer;
 use crate::gfx::camera::controller::FirstPersonController;
 use crate::gfx::camera::projection::{Perspective, Projection};
@@ -9,14 +10,18 @@ use crate::gfx::light::Light;
 use crate::gfx::pipeline::Pipeline;
 use crate::gfx::renderer::Renderer;
 use crate::gfx::texture::{DepthTexture, Texture};
+use crate::gfx::uniform::Uniform;
 use crate::scene::object::particle::{Particle, ParticleInstance};
 use crate::scene::object::plane::Plane;
-use crate::scene::world_map::WorldMap;
+use crate::scene::world_map::{Tile, WorldMap};
 use crate::scene::Scene;
 use glam::{Mat4, Vec3, Vec4};
+use rand::rngs::ThreadRng;
+use rand::Rng;
+use serde::{Deserialize, Serialize};
+use std::fs;
 use std::time::Duration;
 use winit::event::{ElementState, KeyboardInput, WindowEvent};
-use crate::gfx::uniform::Uniform;
 
 mod app;
 mod cfd;
@@ -29,6 +34,24 @@ struct CameraUniform {
     position: Vec4,
     view_matrix: Mat4,
     view_projection: Mat4,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Config {
+    radius: f32,
+    mass: f32,
+    gas_constant: f32,
+    rest_density: f32,
+    thermal_conductivity: f32,
+    small_positive: f32,
+    viscosity: f32,
+    damping_coefficient: f32,
+    damping_threshold: f32,
+    radiation_half_life: f32,
+    buoyancy_coefficient: f32,
+    buoyancy_direction: [f32; 3],
+    gravity: [f32; 3],
+    virtual_particle: [f32; 3],
 }
 
 impl CameraUniform {
@@ -83,10 +106,13 @@ struct FluidSense {
     particle_pipeline: wgpu::RenderPipeline,
     camera: Camera<Perspective>,
     camera_controller: FirstPersonController,
+    world_map: WorldMap,
     scene: Scene,
     light: Light,
     particle: Particle,
     particle_instance_buffer: VertexBuffer,
+    sph: SPH,
+    rng: ThreadRng,
 }
 
 impl App for FluidSense {
@@ -98,7 +124,7 @@ impl App for FluidSense {
         let phong_pipeline = Pipeline::phong(renderer);
         let particle_pipeline = Pipeline::particle(renderer);
 
-        let world_map = WorldMap::from_file("./assets/maps/default.txt");
+        let mut world_map = WorldMap::from_file("./assets/maps/default.txt");
 
         let scene = world_map.build_scene(renderer, &phong_pipeline);
         let (x, z) = scene.user_position();
@@ -115,33 +141,35 @@ impl App for FluidSense {
         let light = Light::new(&renderer, &phong_pipeline, camera.position(), Vec3::ONE);
 
         let particle = Particle::new(renderer);
-        let particle_instances = [
-            ParticleInstance {
-                position: Vec3 {
-                    x: 3.0,
-                    y: 1.0,
-                    z: 3.0,
-                },
-                color: Vec3 {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 1.0,
-                },
-            },
-            ParticleInstance {
-                position: Vec3 {
-                    x: 2.0,
-                    y: 1.5,
-                    z: 2.0,
-                },
-                color: Vec3 {
-                    x: 1.0,
-                    y: 0.0,
-                    z: 0.0,
-                },
-            },
-        ];
-        let particle_instance_buffer = VertexBuffer::new(renderer, &particle_instances);
+
+        let rng = rand::thread_rng();
+
+        let config_file = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/config.json");
+
+        let config_str = fs::read_to_string(config_file).expect("Config file not found");
+
+        let config: Config = serde_json::from_str(&config_str).expect("Unable to parse json");
+
+        let particle_config = ParticleConfig {
+            radius: config.radius,
+            mass: config.mass,
+            gas_constant: config.gas_constant,
+            rest_density: config.rest_density,
+            thermal_conductivity: config.thermal_conductivity,
+            small_positive: config.small_positive,
+            viscosity: config.viscosity,
+            damping_coefficient: config.damping_coefficient,
+            damping_threshold: config.damping_threshold,
+            radiation_half_life: config.radiation_half_life,
+            buoyancy_coefficient: config.buoyancy_coefficient,
+            buoyancy_direction: Vec3::from(config.buoyancy_direction),
+            gravity: Vec3::from(config.gravity),
+            virtual_particle: Vec3::from(config.virtual_particle),
+        };
+
+        let sph = SPH::new(particle_config);
+
+        let particle_instance_buffer = VertexBuffer::new(renderer, sph.get_particle_instances());
 
         Self {
             phong_pipeline,
@@ -149,9 +177,12 @@ impl App for FluidSense {
             camera,
             camera_controller,
             scene,
+            world_map,
             light,
             particle,
             particle_instance_buffer,
+            sph,
+            rng,
         }
     }
 
@@ -166,6 +197,21 @@ impl App for FluidSense {
     fn update(&mut self, dt: Duration) {
         self.camera_controller.update(&mut self.camera, dt);
         self.light.set_position(self.camera.position());
+        self.sph.step(0.001);
+        self.sph.check_particles(&self.world_map);
+
+        if self.sph.get_particle_instances().len() < 500 {
+            let jitter0: f32 = self.rng.gen::<f32>() * 0.2f32;
+            let jitter1: f32 = self.rng.gen::<f32>() / 5.0f32;
+
+            let sim_part = SimulationParticle::new(
+                Vec3::new(6.0 + jitter0, 0.5, 2.0 + jitter1),
+                Vec3::new(0.0, 5.0, 0.0),
+                25.0,
+            );
+
+            self.sph.add_particle(sim_part);
+        }
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -177,12 +223,14 @@ impl App for FluidSense {
         Ok(())
     }
 
-    fn render2<'a>(&'a self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>) {
+    fn render2<'a>(&'a mut self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&self.phong_pipeline);
         self.camera.update(&renderer, render_pass);
         self.light.update(&renderer, render_pass);
         self.scene.draw_mesh(render_pass);
         render_pass.set_pipeline(&self.particle_pipeline);
+        self.particle_instance_buffer
+            .update(renderer, self.sph.get_particle_instances());
         self.particle
             .draw_instanced(render_pass, &self.particle_instance_buffer);
     }

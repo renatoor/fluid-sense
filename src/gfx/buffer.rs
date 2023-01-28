@@ -3,6 +3,7 @@ use crate::Renderer;
 use bytemuck::{Pod, Zeroable};
 use std::fmt::Debug;
 use std::ops::RangeBounds;
+use wgpu::util::DeviceExt;
 
 pub struct VertexBuffer {
     buffer: wgpu::Buffer,
@@ -17,12 +18,30 @@ impl VertexBuffer {
         let buffer = renderer.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(vertices),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let len = vertices.len() as u32;
 
         Self { buffer, len }
+    }
+
+    pub fn update<T: Vertex + Pod + Zeroable>(&mut self, renderer: &Renderer, data: &[T]) {
+        if self.len == data.len() as u32 {
+            renderer
+                .queue
+                .write_buffer(&self.buffer, 0, bytemuck::cast_slice(data));
+        } else {
+            self.buffer = renderer
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: None,
+                    contents: bytemuck::cast_slice(data),
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                });
+
+            self.len = data.len() as u32;
+        }
     }
 
     pub fn slice<S: RangeBounds<wgpu::BufferAddress>>(&self, bounds: S) -> wgpu::BufferSlice {

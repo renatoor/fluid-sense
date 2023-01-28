@@ -15,7 +15,7 @@ pub trait App: 'static + Sized {
     fn update(&mut self, dt: Duration);
     fn resize(&mut self, width: u32, height: u32);
     fn render(&self, renderer: &Renderer) -> Result<(), wgpu::SurfaceError>;
-    fn render2<'a>(&'a self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>);
+    fn render2<'a>(&'a mut self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>);
 }
 
 pub async fn run<A: App>() {
@@ -91,7 +91,7 @@ pub async fn run<A: App>() {
             app.update(dt);
 
             //match app.render(&renderer) {
-            match renderer.render_fn(&app) {
+            match renderer.render_fn(&mut app) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => renderer.configure_surface(),
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
