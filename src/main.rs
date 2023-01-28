@@ -13,7 +13,7 @@ use crate::gfx::texture::{DepthTexture, Texture};
 use crate::gfx::uniform::Uniform;
 use crate::scene::object::particle::{Particle, ParticleInstance};
 use crate::scene::object::plane::Plane;
-use crate::scene::world_map::{Tile, WorldMap};
+use crate::scene::world_map::{Actuator, Sensor, Tile, WorldMap};
 use crate::scene::Scene;
 use glam::{Mat4, Vec3, Vec4};
 use rand::rngs::ThreadRng;
@@ -113,6 +113,8 @@ struct FluidSense {
     particle_instance_buffer: VertexBuffer,
     sph: SPH,
     rng: ThreadRng,
+    actuators: Vec<Actuator>,
+    sensors: Vec<Sensor>,
 }
 
 impl App for FluidSense {
@@ -171,6 +173,12 @@ impl App for FluidSense {
 
         let particle_instance_buffer = VertexBuffer::new(renderer, sph.get_particle_instances());
 
+        let actuators = world_map.get_actuators();
+        let sensors = world_map.get_sensors();
+
+        println!("{:?}", actuators);
+        println!("{:?}", sensors);
+
         Self {
             phong_pipeline,
             particle_pipeline,
@@ -183,6 +191,8 @@ impl App for FluidSense {
             particle_instance_buffer,
             sph,
             rng,
+            actuators,
+            sensors,
         }
     }
 

@@ -8,7 +8,7 @@ use std::str::FromStr;
 use strum_macros::EnumString;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct ActuatorConfig {
+pub struct ActuatorConfig {
     label: char,
     height: f32,
     direction: [f32; 3],
@@ -24,7 +24,7 @@ pub enum FluidType {
 }
 
 #[derive(Debug)]
-struct Actuator {
+pub struct Actuator {
     label: char,
     position: Vec3,
     direction: Vec3,
@@ -47,14 +47,14 @@ impl Actuator {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct SensorConfig {
+pub struct SensorConfig {
     label: char,
     height: f32,
     range: [f32; 3],
 }
 
 #[derive(Debug)]
-struct Sensor {
+pub struct Sensor {
     label: char,
     position: Vec3,
     range: Vec3,
@@ -186,9 +186,7 @@ impl WorldMap {
                             Some(actuator) => {
                                 actuators.push(actuator);
                             }
-                            None => {
-                                println!("Não encontrada configuração para atuador '{}'", c)
-                            }
+                            None => {}
                         }
                     }
                     _ => {}
@@ -199,7 +197,7 @@ impl WorldMap {
         actuators
     }
 
-    pub fn get_sensors(self) -> Vec<Sensor> {
+    pub fn get_sensors(&self) -> Vec<Sensor> {
         let mut sensors = Vec::new();
 
         for (z, row) in self.tiles.iter().enumerate() {
@@ -220,9 +218,7 @@ impl WorldMap {
                             Some(sensor) => {
                                 sensors.push(sensor);
                             }
-                            None => {
-                                println!("Não encontrada configuração para sensor '{}'", c)
-                            }
+                            None => {}
                         }
                     }
                     _ => {}
