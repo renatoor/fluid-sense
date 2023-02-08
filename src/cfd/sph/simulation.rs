@@ -4,6 +4,7 @@ use glam::Vec3;
 use std::collections::LinkedList;
 use std::time::Duration;
 
+#[derive(Debug)]
 pub struct SimulationParticle {
     position: Vec3,
     velocity: Vec3,

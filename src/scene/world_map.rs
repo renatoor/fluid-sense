@@ -1,10 +1,13 @@
 use crate::gfx::vertex::InstanceVertex;
 use crate::scene::object::Transform;
-use crate::{Pipeline, Plane, Renderer, Scene};
+use crate::{Pipeline, Plane, Renderer, Scene, SimulationParticle};
 use glam::{EulerRot, Quat, Vec3};
+use rand::rngs::ThreadRng;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::str::FromStr;
+use std::time::Duration;
 use strum_macros::EnumString;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -13,8 +16,10 @@ pub struct ActuatorConfig {
     height: f32,
     direction: [f32; 3],
     initial_velocity: f32,
+    temperature: Option<f32>,
     range: [f32; 3],
     fluid_type: String,
+    interval: f32,
 }
 
 #[derive(Debug, EnumString)]
@@ -25,24 +30,61 @@ pub enum FluidType {
 
 #[derive(Debug)]
 pub struct Actuator {
+    rng: ThreadRng,
     label: char,
     position: Vec3,
     direction: Vec3,
     initial_velocity: f32,
+    temperature: Option<f32>,
     range: Vec3,
     fluid_type: FluidType,
+    interval: f32,
+    dt: f32,
 }
 
 impl Actuator {
     pub fn new(x: f32, z: f32, config: &ActuatorConfig) -> Self {
         Self {
+            rng: rand::thread_rng(),
             label: config.label,
             position: Vec3::new(x, config.height, z),
             direction: Vec3::from(config.direction),
             initial_velocity: config.initial_velocity,
+            temperature: config.temperature,
             range: Vec3::from(config.range),
             fluid_type: FluidType::from_str(&config.fluid_type).unwrap(),
+            interval: config.interval,
+            dt: 0.0,
         }
+    }
+
+    pub fn emit_particle(&mut self, dt: &Duration) -> Option<SimulationParticle> {
+        self.dt += dt.as_secs_f32();
+
+        if self.dt < self.interval {
+            return None;
+        }
+
+        self.dt = 0.0;
+
+        let jitter_x: f32 = self.rng.gen::<f32>() * self.range.x;
+        let jitter_y: f32 = self.rng.gen::<f32>() * self.range.y;
+        let jitter_z: f32 = self.rng.gen::<f32>() * self.range.z;
+
+        let position = Vec3::new(
+            self.position.x + jitter_x,
+            self.position.y + jitter_y,
+            self.position.z + jitter_z,
+        );
+        let velocity = self.direction * self.initial_velocity;
+        let temperature = match self.temperature {
+            None => 25.0,
+            Some(temperature) => temperature,
+        };
+
+        let particle = SimulationParticle::new(position, velocity, temperature);
+
+        Some(particle)
     }
 }
 
@@ -180,7 +222,7 @@ impl WorldMap {
                             .iter()
                             .filter(|config| config.label == *c)
                             .next()
-                            .map(|config| Actuator::new(x, z, config));
+                            .map(|config| Actuator::new(x + 0.5, z + 0.5, config));
 
                         match actuator {
                             Some(actuator) => {
@@ -238,6 +280,7 @@ impl WorldMap {
 
                 return match tile {
                     Tile::User => &Tile::Floor,
+                    Tile::Device(_) => &Tile::Floor,
                     _ => tile,
                 };
             }

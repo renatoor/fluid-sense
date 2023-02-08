@@ -176,9 +176,6 @@ impl App for FluidSense {
         let actuators = world_map.get_actuators();
         let sensors = world_map.get_sensors();
 
-        println!("{:?}", actuators);
-        println!("{:?}", sensors);
-
         Self {
             phong_pipeline,
             particle_pipeline,
@@ -210,17 +207,13 @@ impl App for FluidSense {
         self.sph.step(0.001);
         self.sph.check_particles(&self.world_map);
 
-        if self.sph.get_particle_instances().len() < 500 {
-            let jitter0: f32 = self.rng.gen::<f32>() * 0.2f32;
-            let jitter1: f32 = self.rng.gen::<f32>() / 5.0f32;
-
-            let sim_part = SimulationParticle::new(
-                Vec3::new(6.0 + jitter0, 0.5, 2.0 + jitter1),
-                Vec3::new(0.0, 5.0, 0.0),
-                25.0,
-            );
-
-            self.sph.add_particle(sim_part);
+        for mut actuator in &mut self.actuators {
+            match actuator.emit_particle(&dt) {
+                None => {}
+                Some(particle) => {
+                    self.sph.add_particle(particle);
+                }
+            }
         }
     }
 
