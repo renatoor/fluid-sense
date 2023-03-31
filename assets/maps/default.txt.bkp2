@@ -1,9 +1,9 @@
 #########
 #......!#
 #.......#
-#.@.....#
+#...@...#
 #.......#
-#......$#
+#.......#
 #########
 ---
 {
@@ -18,21 +18,26 @@
     "interval": 0.05,
     "particle": {
         "size": 0.2,
-        "color": [0.0, 0.0, 1.0]
+        "color": [1.0, 0.0, 0.0]
     }
  },
- {
+  {
+     "label": "%",
+     "height": 0.5,
+     "direction": [0.0, 1.0, 0.0],
+     "initial_velocity": 5.0,
+     "range": [0.2, 0.0, 0.2],
+     "fluid_type": "Gaseous",
+     "interval": 0.05
+  },
+  {
      "label": "$",
      "height": 1.5,
-     "direction": [-1.0, 0.0, -1.0],
-     "initial_velocity": 5.0,
+     "direction": [0.0, -1.0, 0.0],
+     "initial_velocity": 2.0,
      "range": [0.2, 0.2, 0.2],
      "fluid_type": "Gaseous",
-     "interval": 0.05,
-     "particle": {
-         "size": 0.2,
-         "color": [1.0, 0.0, 0.0]
-     }
+     "interval": 0.05
   }
  ],
  "sensors": [

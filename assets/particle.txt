@@ -1,0 +1,6 @@
+Sensor $ detected particle: SimulationParticle { position: Vec3(10.018025, 0.7693787, 2.5054493), velocity: Vec3(4.703433, 0.1126168, -0.03597559), acceleration: Vec3(1.2299718, 6.2380195, -4.005216), forces: Vec3(20422.3, 103575.305, -66502.12), density: 16603.877, density_correction: 16799.46, temperature: 12.905116 }
+Sensior $ detected particle: SimulationParticle { position: Vec3(10.004456, 0.7500944, 2.6584342), velocity: Vec3(4.7168574, 0.11994725, 0.077768914), acceleration: Vec3(-464.57947, 183.32372, 131.6309), forces: Vec3(-7625918.5, 3009198.3, 2160677.8), density: 16414.67, density_correction: 16414.67, temperature: 11.699544 }
+
+
+Relação DT -> Framerate -> Inverval(Partícula)
+Modo de execução headless

@@ -215,6 +215,19 @@ impl App for FluidSense {
                 }
             }
         }
+
+        for particle in self.sph.get_particles() {
+            match self.world_map.get_device_in_position(particle.position) {
+                None => {}
+                Some(label) => {
+                    let sensors = self.sensors.iter().filter(|sensor| sensor.label == label).collect::<Vec<&Sensor>>();
+
+                    for sensor in sensors {
+                        sensor.inspect_particle(particle);
+                    }
+                }
+            }
+        }
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -242,4 +255,64 @@ impl App for FluidSense {
 #[tokio::main]
 async fn main() {
     app::run::<FluidSense>().await;
+}
+
+fn main2() {
+    let mut world_map = WorldMap::from_file("./assets/maps/default.txt");
+    let config_file = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/config.json");
+
+    let config_str = fs::read_to_string(config_file).expect("Config file not found");
+
+    let config: Config = serde_json::from_str(&config_str).expect("Unable to parse json");
+
+    let particle_config = ParticleConfig {
+        radius: config.radius,
+        mass: config.mass,
+        gas_constant: config.gas_constant,
+        rest_density: config.rest_density,
+        thermal_conductivity: config.thermal_conductivity,
+        small_positive: config.small_positive,
+        viscosity: config.viscosity,
+        damping_coefficient: config.damping_coefficient,
+        damping_threshold: config.damping_threshold,
+        radiation_half_life: config.radiation_half_life,
+        buoyancy_coefficient: config.buoyancy_coefficient,
+        buoyancy_direction: Vec3::from(config.buoyancy_direction),
+        gravity: Vec3::from(config.gravity),
+        virtual_particle: Vec3::from(config.virtual_particle),
+    };
+
+    let mut sph = SPH::new(particle_config);
+
+    let mut actuators = world_map.get_actuators();
+    let sensors = world_map.get_sensors();
+
+    loop {
+        sph.step(0.001);
+        sph.check_particles(&world_map);
+
+        let dt = Duration::from_secs_f64(0.016);
+
+        for mut actuator in &mut actuators {
+            match actuator.emit_particle(&dt) {
+                None => {}
+                Some(particle) => {
+                    sph.add_particle(particle);
+                }
+            }
+        }
+
+        for particle in sph.get_particles() {
+            match world_map.get_device_in_position(particle.position) {
+                None => {}
+                Some(label) => {
+                    let sensors = sensors.iter().filter(|sensor| sensor.label == label).collect::<Vec<&Sensor>>();
+
+                    for sensor in sensors {
+                        sensor.inspect_particle(particle);
+                    }
+                }
+            }
+        }
+    }
 }

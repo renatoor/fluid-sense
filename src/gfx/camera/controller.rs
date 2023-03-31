@@ -10,7 +10,7 @@ const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 pub struct FirstPersonController {
     pitch: f32,
     yaw: f32,
-    movement: (f32, f32, f32, f32),
+    movement: (f32, f32, f32, f32, f32, f32),
     rotation: (f32, f32),
     speed: f32,
     sensitivity: f32,
@@ -21,7 +21,7 @@ impl FirstPersonController {
         Self {
             pitch: pitch.to_radians(),
             yaw: yaw.to_radians(),
-            movement: (0.0, 0.0, 0.0, 0.0),
+            movement: (0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             rotation: (0.0, 0.0),
             speed,
             sensitivity,
@@ -39,6 +39,8 @@ impl FirstPersonController {
                 VirtualKeyCode::A => self.movement.1 = 1.0,
                 VirtualKeyCode::S => self.movement.2 = 1.0,
                 VirtualKeyCode::D => self.movement.3 = 1.0,
+                VirtualKeyCode::LShift => self.movement.4 = 1.0,
+                VirtualKeyCode::Space => self.movement.5 = 1.0,
                 _ => {}
             },
             KeyboardInput {
@@ -50,6 +52,8 @@ impl FirstPersonController {
                 VirtualKeyCode::A => self.movement.1 = 0.0,
                 VirtualKeyCode::S => self.movement.2 = 0.0,
                 VirtualKeyCode::D => self.movement.3 = 0.0,
+                VirtualKeyCode::LShift => self.movement.4 = 0.0,
+                VirtualKeyCode::Space => self.movement.5 = 0.0,
                 _ => {}
             },
             _ => {}
@@ -78,6 +82,7 @@ impl FirstPersonController {
         camera.up = right.cross(direction);
         camera.eye += forward * (self.movement.0 - self.movement.2) * self.speed * dt;
         camera.eye -= right * (self.movement.1 - self.movement.3) * self.speed * dt;
+        camera.eye += Vec3::Y * (self.movement.4 - self.movement.5) * self.speed * dt;
         camera.center = camera.eye + direction;
 
         self.rotation = (0.0, 0.0);

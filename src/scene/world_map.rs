@@ -1,14 +1,21 @@
 use crate::gfx::vertex::InstanceVertex;
 use crate::scene::object::Transform;
-use crate::{Pipeline, Plane, Renderer, Scene, SimulationParticle};
+use crate::{ParticleConfig, Pipeline, Plane, Renderer, Scene, SimulationParticle};
 use glam::{EulerRot, Quat, Vec3};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::os::unix::process::parent_id;
 use std::str::FromStr;
 use std::time::Duration;
 use strum_macros::EnumString;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ActuatorParticleConfig {
+    size: f32,
+    color: [f32; 3],
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ActuatorConfig {
@@ -20,12 +27,28 @@ pub struct ActuatorConfig {
     range: [f32; 3],
     fluid_type: String,
     interval: f32,
+    particle: ActuatorParticleConfig,
 }
 
-#[derive(Debug, EnumString)]
+#[derive(Debug, EnumString, Clone, PartialEq)]
 pub enum FluidType {
     Gaseous,
     Liquid,
+}
+
+#[derive(Debug)]
+pub struct ActuatorParticle {
+    size: f32,
+    color: Vec3,
+}
+
+impl ActuatorParticle {
+    pub fn new(config: &ActuatorParticleConfig) -> Self {
+        Self {
+            size: config.size,
+            color: Vec3::from(config.color),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -40,6 +63,7 @@ pub struct Actuator {
     fluid_type: FluidType,
     interval: f32,
     dt: f32,
+    particle: ActuatorParticle,
 }
 
 impl Actuator {
@@ -55,6 +79,7 @@ impl Actuator {
             fluid_type: FluidType::from_str(&config.fluid_type).unwrap(),
             interval: config.interval,
             dt: 0.0,
+            particle: ActuatorParticle::new(&config.particle),
         }
     }
 
@@ -76,13 +101,15 @@ impl Actuator {
             self.position.y + jitter_y,
             self.position.z + jitter_z,
         );
+
         let velocity = self.direction * self.initial_velocity;
+
         let temperature = match self.temperature {
             None => 25.0,
             Some(temperature) => temperature,
         };
 
-        let particle = SimulationParticle::new(position, velocity, temperature);
+        let particle = SimulationParticle::new(position, velocity, temperature, self.fluid_type.clone(), self.particle.color);
 
         Some(particle)
     }
@@ -97,7 +124,7 @@ pub struct SensorConfig {
 
 #[derive(Debug)]
 pub struct Sensor {
-    label: char,
+    pub(crate) label: char,
     position: Vec3,
     range: Vec3,
 }
@@ -109,6 +136,10 @@ impl Sensor {
             position: Vec3::new(x, config.height, z),
             range: Vec3::from(config.range),
         }
+    }
+
+    pub fn inspect_particle(&self, particle: &SimulationParticle) {
+        // println!("Sensor {} detected particle: {:?}", self.label, particle);
     }
 }
 
@@ -248,20 +279,21 @@ impl WorldMap {
 
                 match tile {
                     Tile::Device(c) => {
-                        let sensor = self
+                        let sensors_by_label = self
                             .config
                             .sensors
                             .iter()
                             .filter(|s| s.label == *c)
-                            .next()
                             .map(|config| Sensor::new(x, z, config));
 
-                        match sensor {
-                            Some(sensor) => {
-                                sensors.push(sensor);
-                            }
-                            None => {}
-                        }
+                        sensors.extend(sensors_by_label);
+                        println!("sensors from {}: {:?}", c, sensors);
+                        // match sensor {
+                        //     Some(sensor) => {
+                        //         sensors.push(sensor);
+                        //     }
+                        //     None => {}
+                        // }
                     }
                     _ => {}
                 }
@@ -287,6 +319,23 @@ impl WorldMap {
         }
 
         return &Tile::Empty;
+    }
+
+    pub fn get_device_in_position(&self, position: Vec3) -> Option<char> {
+        let (x, z) = ((position.x) as usize, (position.z) as usize);
+
+        if z <= self.tiles.len() {
+            if x <= self.tiles[z].len() {
+                let tile = &self.tiles[z][x];
+
+                return match tile {
+                    Tile::Device(c) => Some(*c),
+                    _ => None,
+                };
+            }
+        }
+
+        return None;
     }
 
     fn create_floor_instance(x: f32, z: f32) -> InstanceVertex {
