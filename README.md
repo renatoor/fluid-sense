@@ -6,6 +6,8 @@
 
 ## Executando o projeto
 
+```
 git clone https://github.com/GPMM/fluid-sense
 cd fluid-sense
 cargo run
+```
