@@ -1,7 +1,7 @@
 use crate::gfx::buffer::{IndexBuffer, VertexBuffer};
 use crate::gfx::texture::Texture;
-use crate::gfx::vertex::{ModelVertex};
-use crate::{Renderer};
+use crate::gfx::vertex::ModelVertex;
+use crate::Renderer;
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 

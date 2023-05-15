@@ -1,4 +1,4 @@
-use crate::{Renderer};
+use crate::Renderer;
 use image::GenericImageView;
 
 pub struct Texture {

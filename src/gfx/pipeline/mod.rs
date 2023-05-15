@@ -1,7 +1,6 @@
 //pub mod builder;
 // pub mod phong;
 
-
 use crate::gfx::vertex::{InstanceVertex, ModelVertex, Vertex};
 use crate::scene::object::particle::ParticleVertex;
 use crate::{ParticleInstance, Renderer};

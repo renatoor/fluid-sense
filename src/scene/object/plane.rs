@@ -1,9 +1,9 @@
 use crate::gfx::buffer::{IndexBuffer, VertexBuffer};
 use crate::gfx::mesh::{Mesh, Model};
 use crate::gfx::texture::Texture;
-use crate::gfx::vertex::{ModelVertex};
+use crate::gfx::vertex::ModelVertex;
 
-use crate::{Renderer};
+use crate::Renderer;
 use glam::{Vec2, Vec3};
 
 pub struct Plane {

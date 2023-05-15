@@ -1,12 +1,8 @@
-
-
-
 use glam::Vec3;
-use rayon::prelude::*;
 
-use crate::{ParticleInstance, Tile, WorldMap};
 use crate::cfd::config::{Config, FluidType, SimulationConfig};
 use crate::cfd::sph::kernel::Kernel;
+use crate::{ParticleInstance, Tile, WorldMap};
 
 #[derive(Debug)]
 pub struct SimulationParticle {

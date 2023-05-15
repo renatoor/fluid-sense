@@ -10,10 +10,7 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-
-
 use std::time::Duration;
-
 
 #[derive(Debug)]
 struct ActuatorParticle {

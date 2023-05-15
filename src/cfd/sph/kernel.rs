@@ -1,7 +1,6 @@
 use glam::Vec3;
 use std::f32::consts::PI;
 
-
 struct Poly6 {
     radius: f32,
     radius_sqr: f32,

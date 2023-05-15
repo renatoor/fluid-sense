@@ -1,6 +1,5 @@
 use crate::gfx::camera::projection::Projection;
 
-
 use crate::{App, Camera, DepthTexture, Light, Scene};
 use bytemuck::{Pod, Zeroable};
 

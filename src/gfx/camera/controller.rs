@@ -1,5 +1,5 @@
 use crate::gfx::camera::projection::Projection;
-use crate::{Camera};
+use crate::Camera;
 use glam::Vec3;
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
