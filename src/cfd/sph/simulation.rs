@@ -69,7 +69,11 @@ impl SPH {
         let size = particle.size;
         let color = particle.color.clone();
         self.particles.push(particle);
-        self.instances.push(ParticleInstance { position, size, color });
+        self.instances.push(ParticleInstance {
+            position,
+            size,
+            color,
+        });
     }
 
     pub fn remove_particle(&mut self, index: usize) {
