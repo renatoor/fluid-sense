@@ -73,10 +73,6 @@ impl Renderer {
         renderer
     }
 
-    pub fn device(&self) -> &wgpu::Device {
-        &self.device
-    }
-
     #[allow(dead_code)]
     pub fn get_texture_format(&self) -> wgpu::TextureFormat {
         self.config.format
@@ -148,13 +144,6 @@ impl Renderer {
 
     pub fn create_shader_module(&self, desc: wgpu::ShaderModuleDescriptor) -> wgpu::ShaderModule {
         self.device.create_shader_module(desc)
-    }
-
-    pub fn create_render_pipeline(
-        &self,
-        desc: &wgpu::RenderPipelineDescriptor,
-    ) -> wgpu::RenderPipeline {
-        self.device.create_render_pipeline(desc)
     }
 
     pub fn render<T: Projection>(

@@ -6,7 +6,7 @@ use crate::{ParticleInstance, Tile, WorldMap};
 
 #[derive(Debug)]
 pub struct SimulationParticle {
-    pub(crate) position: Vec3,
+    pub position: Vec3,
     velocity: Vec3,
     acceleration: Vec3,
     forces: Vec3,
@@ -14,6 +14,7 @@ pub struct SimulationParticle {
     density_correction: f32,
     temperature: f32,
     fluid_type: FluidType,
+    size: f32,
     color: Vec3,
 }
 
@@ -23,6 +24,7 @@ impl SimulationParticle {
         velocity: Vec3,
         temperature: f32,
         fluid_type: FluidType,
+        size: f32,
         color: Vec3,
     ) -> Self {
         Self {
@@ -34,6 +36,7 @@ impl SimulationParticle {
             density_correction: 0.0,
             temperature,
             fluid_type,
+            size,
             color,
         }
     }
@@ -63,9 +66,10 @@ impl SPH {
 
     pub fn add_particle(&mut self, particle: SimulationParticle) {
         let position = particle.position.clone();
+        let size = particle.size;
         let color = particle.color.clone();
         self.particles.push(particle);
-        self.instances.push(ParticleInstance { position, color });
+        self.instances.push(ParticleInstance { position, size, color });
     }
 
     pub fn remove_particle(&mut self, index: usize) {
@@ -159,10 +163,6 @@ impl SPH {
             pi.density_correction =
                 pi.density * (1.0 + v0 * self.kernel.w(self.config.virtual_particle));
         }
-    }
-
-    fn compute_pressure(&mut self, density: f32) -> f32 {
-        self.config.gas_constant * (density - self.config.rest_density)
     }
 
     fn compute_forces(&mut self) {

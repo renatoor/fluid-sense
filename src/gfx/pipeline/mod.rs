@@ -4,24 +4,10 @@
 use crate::gfx::vertex::{InstanceVertex, ModelVertex, Vertex};
 use crate::scene::object::particle::ParticleVertex;
 use crate::{ParticleInstance, Renderer};
-use std::collections::HashMap;
 
-pub struct Pipeline {
-    pub render_pipeline: wgpu::RenderPipeline,
-    layouts: HashMap<String, wgpu::BindGroupLayout>,
-}
+pub struct Pipeline {}
 
 impl Pipeline {
-    pub fn new(
-        render_pipeline: wgpu::RenderPipeline,
-        layouts: HashMap<String, wgpu::BindGroupLayout>,
-    ) -> Self {
-        Self {
-            render_pipeline,
-            layouts,
-        }
-    }
-
     pub fn phong(renderer: &Renderer) -> wgpu::RenderPipeline {
         let shader = renderer.create_shader_module(wgpu::include_wgsl!(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -195,13 +181,5 @@ impl Pipeline {
                 }),
                 multiview: None,
             })
-    }
-
-    pub fn get_layout(&self, label: &str) -> Option<&wgpu::BindGroupLayout> {
-        self.layouts.get(label)
-    }
-
-    pub fn set_pipeline<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
-        render_pass.set_pipeline(&self.render_pipeline);
     }
 }

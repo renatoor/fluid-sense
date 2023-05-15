@@ -3,22 +3,20 @@ extern crate core;
 use std::time::Duration;
 
 use clap::Parser;
-use glam::{Mat4, Vec3, Vec4};
+use glam::Vec3;
 
-use serde::{Deserialize, Serialize};
 use winit::event::KeyboardInput;
 
 use crate::app::App;
 use crate::cfd::sph::simulation::{SimulationParticle, SPH};
 use crate::gfx::buffer::VertexBuffer;
 use crate::gfx::camera::controller::FirstPersonController;
-use crate::gfx::camera::projection::{Perspective, Projection};
+use crate::gfx::camera::projection::Perspective;
 use crate::gfx::camera::Camera;
 use crate::gfx::light::Light;
 use crate::gfx::pipeline::Pipeline;
 use crate::gfx::renderer::Renderer;
 use crate::gfx::texture::DepthTexture;
-use crate::gfx::uniform::Uniform;
 use crate::scene::object::particle::{Particle, ParticleInstance};
 use crate::scene::object::plane::Plane;
 use crate::scene::world_map::{Tile, WorldMap};
@@ -28,79 +26,6 @@ mod app;
 mod cfd;
 mod gfx;
 mod scene;
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct CameraUniform {
-    position: Vec4,
-    view_matrix: Mat4,
-    view_projection: Mat4,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Config {
-    radius: f32,
-    mass: f32,
-    gas_constant: f32,
-    rest_density: f32,
-    thermal_conductivity: f32,
-    small_positive: f32,
-    viscosity: f32,
-    damping_coefficient: f32,
-    damping_threshold: f32,
-    radiation_half_life: f32,
-    buoyancy_coefficient: f32,
-    buoyancy_direction: [f32; 3],
-    gravity: [f32; 3],
-    virtual_particle: [f32; 3],
-}
-
-impl CameraUniform {
-    pub fn new<T>(camera: Camera<T>) -> Self
-    where
-        T: Projection,
-    {
-        let position = Vec4::from((camera.position(), 1.0));
-        let view_matrix = camera.view();
-        let view_projection = camera.projection() * camera.view();
-
-        Self {
-            position,
-            view_matrix,
-            view_projection,
-        }
-    }
-
-    pub fn update<T>(&mut self, camera: Camera<T>)
-    where
-        T: Projection,
-    {
-        self.position = Vec4::from((camera.position(), 1.0));
-        self.view_matrix = camera.view();
-        self.view_projection = camera.projection() * camera.view();
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct LightUniform {
-    position: Vec4,
-    color: Vec4,
-}
-
-impl LightUniform {
-    pub fn new(position: Vec3, color: Vec3) -> Self {
-        Self {
-            position: Vec4::from((position, 1.0)),
-            color: Vec4::from((color, 1.0)),
-        }
-    }
-}
-
-struct Uniforms {
-    camera: Uniform,
-    light: Uniform,
-}
 
 struct FluidSense {
     phong_pipeline: wgpu::RenderPipeline,
@@ -113,8 +38,6 @@ struct FluidSense {
     particle: Particle,
     particle_instance_buffer: VertexBuffer,
     sph: SPH,
-    // actuators: Vec<Actuator>,
-    // sensors: Vec<Sensor>,
 }
 
 #[derive(Parser, Debug)]
@@ -220,7 +143,6 @@ impl App for FluidSense {
     }
 }
 
-//#[tokio::main]
 fn main() {
     let args = Args::parse();
 

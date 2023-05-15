@@ -1,9 +1,8 @@
+use crate::cfd::config::{ActuatorConfig, Config, FluidType, ParticleConfig, SensorConfig};
 use crate::gfx::vertex::InstanceVertex;
 use crate::scene::object::Transform;
 use crate::{Renderer, Scene, SimulationParticle};
 use std::collections::HashMap;
-// use crate::cfd::config::Config;
-use crate::cfd::config::{ActuatorConfig, Config, FluidType, ParticleConfig, SensorConfig};
 
 use glam::{EulerRot, Quat, Vec3};
 use rand::rngs::ThreadRng;
@@ -88,6 +87,7 @@ impl Actuator {
             velocity,
             temperature,
             self.fluid_type.clone(),
+            self.particle.size,
             self.particle.color,
         );
 
@@ -97,22 +97,27 @@ impl Actuator {
 
 #[derive(Debug)]
 pub struct Sensor {
+    label: char,
     position: Vec3,
     range: Vec3,
     output: Option<String>,
 }
 
 impl Sensor {
-    pub fn new(x: f32, z: f32, config: &SensorConfig) -> Self {
+    pub fn new(label: char, x: f32, z: f32, config: &SensorConfig) -> Self {
         Self {
+            label,
             position: Vec3::new(x, config.height, z),
             range: config.range,
             output: config.output.clone(),
         }
     }
 
-    pub fn inspect_particle(&self, _particle: &SimulationParticle) {
-        // println!("Sensor {} detected particle: {:?}", self.label, particle);
+    pub fn inspect_particle(&self, particle: &SimulationParticle) {
+        println!(
+            "Sensor({}, {}, {}, {:?}) detected particle: {:?}",
+            self.label, self.position, self.range, self.output, particle
+        );
     }
 }
 
@@ -184,7 +189,7 @@ impl WorldMap {
 
                     match config.get_sensor_by_label(c) {
                         Some(config) => {
-                            sensors.insert(*c, Sensor::new(x, z, config));
+                            sensors.insert(*c, Sensor::new(*c, x, z, config));
                         }
                         None => {}
                     }

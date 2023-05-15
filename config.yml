@@ -16,7 +16,7 @@ actuators:
     fluid_type: Gaseous
     interval: 0.05
     particle:
-      size: 0.2
+      size: 0.02
       color: [0.0, 0.0, 1.0]
   b:
     height: 1.5
@@ -26,10 +26,10 @@ actuators:
     fluid_type: Gaseous
     interval: 0.05
     particle:
-      size: 0.2
+      size: 0.02
       color: [1.0, 0.0, 0.0]
 sensors:
-  b:
+  c:
     height: 1.0
     range: [10.0, 1.0, 1.0]
     output: "nomedoarquivo.csv"
