@@ -1,10 +1,10 @@
 //pub mod builder;
 // pub mod phong;
 
-use crate::gfx::texture::Texture;
+
 use crate::gfx::vertex::{InstanceVertex, ModelVertex, Vertex};
 use crate::scene::object::particle::ParticleVertex;
-use crate::{Particle, ParticleInstance, Renderer};
+use crate::{ParticleInstance, Renderer};
 use std::collections::HashMap;
 
 pub struct Pipeline {

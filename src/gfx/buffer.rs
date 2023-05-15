@@ -1,7 +1,7 @@
 use crate::gfx::vertex::Vertex;
 use crate::Renderer;
 use bytemuck::{Pod, Zeroable};
-use std::fmt::Debug;
+
 use std::ops::RangeBounds;
 use wgpu::util::DeviceExt;
 

@@ -1,6 +1,6 @@
 use crate::scene::object::Transform;
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat3, Mat4, Vec2, Vec3};
+use glam::{Mat3, Vec2, Vec3};
 
 pub trait Vertex {
     fn desc<'a>() -> wgpu::VertexBufferLayout<'a>;

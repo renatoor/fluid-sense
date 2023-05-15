@@ -1,5 +1,5 @@
 use glam::Vec3;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use strum_macros::EnumString;
 

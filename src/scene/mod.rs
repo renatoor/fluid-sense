@@ -1,10 +1,10 @@
 use crate::gfx::buffer::VertexBuffer;
-use crate::gfx::mesh::{Material, Mesh};
+use crate::gfx::mesh::{Mesh};
 use crate::gfx::texture::Texture;
 use crate::gfx::vertex::InstanceVertex;
 use crate::scene::object::cube::Cube;
-use crate::{Pipeline, Plane, Renderer};
-use glam::{Vec3, Vec4};
+use crate::{Plane, Renderer};
+
 
 pub mod object;
 pub mod world_map;

@@ -1,7 +1,7 @@
 use crate::gfx::renderer::Renderer;
-use clap::Parser;
+
 use std::time::{Duration, Instant};
-use winit::dpi::{PhysicalPosition, PhysicalSize};
+use winit::dpi::{PhysicalPosition};
 use winit::platform::unix::WindowBuilderExtUnix;
 use winit::{
     event::*,

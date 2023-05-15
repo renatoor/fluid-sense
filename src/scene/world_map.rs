@@ -1,19 +1,19 @@
 use crate::gfx::vertex::InstanceVertex;
 use crate::scene::object::Transform;
-use crate::{Pipeline, Plane, Renderer, Scene, SimulationParticle};
+use crate::{Renderer, Scene, SimulationParticle};
 use std::collections::HashMap;
 // use crate::cfd::config::Config;
 use crate::cfd::config::{ActuatorConfig, Config, FluidType, ParticleConfig, SensorConfig};
-use crate::scene::world_map;
+
 use glam::{EulerRot, Quat, Vec3};
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::os::unix::process::parent_id;
-use std::str::FromStr;
+
+
+
 use std::time::Duration;
-use strum_macros::EnumString;
+
 
 #[derive(Debug)]
 struct ActuatorParticle {
@@ -114,7 +114,7 @@ impl Sensor {
         }
     }
 
-    pub fn inspect_particle(&self, particle: &SimulationParticle) {
+    pub fn inspect_particle(&self, _particle: &SimulationParticle) {
         // println!("Sensor {} detected particle: {:?}", self.label, particle);
     }
 }

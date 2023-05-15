@@ -1,10 +1,10 @@
 use crate::gfx::buffer::{IndexBuffer, VertexBuffer};
-use crate::gfx::mesh::{Material, Mesh, Model};
+use crate::gfx::mesh::{Mesh, Model};
 use crate::gfx::texture::Texture;
-use crate::gfx::vertex::{ColoredVertex, ModelVertex};
-use crate::scene::object::Transform;
-use crate::{Pipeline, Renderer};
-use glam::{EulerRot, Mat4, Quat, Vec2, Vec3};
+use crate::gfx::vertex::{ModelVertex};
+
+use crate::{Renderer};
+use glam::{Vec2, Vec3};
 
 pub struct Plane {
     vertex_buffer: VertexBuffer,

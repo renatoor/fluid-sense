@@ -1,11 +1,11 @@
 use crate::gfx::camera::projection::Projection;
-use crate::gfx::pipeline::Pipeline;
-use crate::gfx::texture::Texture;
+
+
 use crate::{App, Camera, DepthTexture, Light, Scene};
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Quat, Vec3};
+
 use wgpu::util::DeviceExt;
-use wgpu::BindingResource;
+
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 

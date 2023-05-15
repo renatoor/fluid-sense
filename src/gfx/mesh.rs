@@ -1,7 +1,7 @@
 use crate::gfx::buffer::{IndexBuffer, VertexBuffer};
 use crate::gfx::texture::Texture;
-use crate::gfx::vertex::{InstanceVertex, ModelVertex};
-use crate::{Pipeline, Renderer};
+use crate::gfx::vertex::{ModelVertex};
+use crate::{Renderer};
 use bytemuck::{Pod, Zeroable};
 use glam::Vec3;
 
@@ -32,7 +32,7 @@ pub struct Mesh {
 impl Mesh {
     pub fn new(
         renderer: &Renderer,
-        pipeline: &wgpu::RenderPipeline,
+        _pipeline: &wgpu::RenderPipeline,
         model: Model,
         texture: Texture,
     ) -> Self {

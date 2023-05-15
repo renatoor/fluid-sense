@@ -1,11 +1,11 @@
-use crate::gfx::buffer::{IndexBuffer, VertexBuffer};
+use crate::gfx::buffer::{VertexBuffer};
 use crate::gfx::mesh::{Mesh, Model};
 use crate::gfx::texture::Texture;
-use crate::gfx::vertex::{ColoredVertex, ModelVertex};
-use crate::scene::object::{Object, Transform};
-use crate::{Pipeline, Renderer};
+use crate::gfx::vertex::{ModelVertex};
+
+use crate::{Renderer};
 use glam::{Vec2, Vec3};
-use wgpu::RenderPass;
+
 
 pub struct Cube {
     vertex_buffer: VertexBuffer,

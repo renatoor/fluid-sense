@@ -1,14 +1,14 @@
 extern crate core;
 
-use std::{env, fs};
+
 use std::time::Duration;
 
 use clap::Parser;
 use glam::{Mat4, Vec3, Vec4};
-use rand::Rng;
-use rand::rngs::ThreadRng;
+
+
 use serde::{Deserialize, Serialize};
-use winit::event::{ElementState, KeyboardInput, WindowEvent};
+use winit::event::{KeyboardInput};
 
 use crate::app::App;
 use crate::cfd::sph::simulation::{SimulationParticle, SPH};
@@ -19,12 +19,12 @@ use crate::gfx::camera::projection::{Perspective, Projection};
 use crate::gfx::light::Light;
 use crate::gfx::pipeline::Pipeline;
 use crate::gfx::renderer::Renderer;
-use crate::gfx::texture::{DepthTexture, Texture};
+use crate::gfx::texture::{DepthTexture};
 use crate::gfx::uniform::Uniform;
 use crate::scene::object::particle::{Particle, ParticleInstance};
 use crate::scene::object::plane::Plane;
 use crate::scene::Scene;
-use crate::scene::world_map::{Actuator, Sensor, Tile, WorldMap};
+use crate::scene::world_map::{Tile, WorldMap};
 
 mod app;
 mod cfd;

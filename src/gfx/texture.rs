@@ -1,4 +1,4 @@
-use crate::{Pipeline, Renderer};
+use crate::{Renderer};
 use image::GenericImageView;
 
 pub struct Texture {
