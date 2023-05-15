@@ -58,7 +58,7 @@ impl Renderer {
 
         surface.configure(&device, &config);
 
-        Self {
+        let mut renderer = Renderer {
             size,
             surface,
             device,
@@ -66,7 +66,12 @@ impl Renderer {
             config,
             clear_color,
             depth_texture: None,
-        }
+        };
+
+        let depth_texture = DepthTexture::new(&renderer);
+        renderer.set_depth_texture(depth_texture);
+
+        renderer
     }
 
     pub fn device(&self) -> &wgpu::Device {

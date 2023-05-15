@@ -1,6 +1,10 @@
 use crate::gfx::vertex::InstanceVertex;
 use crate::scene::object::Transform;
-use crate::{ParticleConfig, Pipeline, Plane, Renderer, Scene, SimulationParticle};
+use crate::{Pipeline, Plane, Renderer, Scene, SimulationParticle};
+use std::collections::HashMap;
+// use crate::cfd::config::Config;
+use crate::cfd::config::{ActuatorConfig, Config, FluidType, ParticleConfig, SensorConfig};
+use crate::scene::world_map;
 use glam::{EulerRot, Quat, Vec3};
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -11,42 +15,17 @@ use std::str::FromStr;
 use std::time::Duration;
 use strum_macros::EnumString;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ActuatorParticleConfig {
-    size: f32,
-    color: [f32; 3],
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ActuatorConfig {
-    label: char,
-    height: f32,
-    direction: [f32; 3],
-    initial_velocity: f32,
-    temperature: Option<f32>,
-    range: [f32; 3],
-    fluid_type: String,
-    interval: f32,
-    particle: ActuatorParticleConfig,
-}
-
-#[derive(Debug, EnumString, Clone, PartialEq)]
-pub enum FluidType {
-    Gaseous,
-    Liquid,
-}
-
 #[derive(Debug)]
-pub struct ActuatorParticle {
+struct ActuatorParticle {
     size: f32,
     color: Vec3,
 }
 
 impl ActuatorParticle {
-    pub fn new(config: &ActuatorParticleConfig) -> Self {
+    pub fn new(config: &ParticleConfig) -> Self {
         Self {
             size: config.size,
-            color: Vec3::from(config.color),
+            color: config.color,
         }
     }
 }
@@ -54,7 +33,6 @@ impl ActuatorParticle {
 #[derive(Debug)]
 pub struct Actuator {
     rng: ThreadRng,
-    label: char,
     position: Vec3,
     direction: Vec3,
     initial_velocity: f32,
@@ -70,13 +48,12 @@ impl Actuator {
     pub fn new(x: f32, z: f32, config: &ActuatorConfig) -> Self {
         Self {
             rng: rand::thread_rng(),
-            label: config.label,
             position: Vec3::new(x, config.height, z),
-            direction: Vec3::from(config.direction),
+            direction: config.direction,
             initial_velocity: config.initial_velocity,
             temperature: config.temperature,
-            range: Vec3::from(config.range),
-            fluid_type: FluidType::from_str(&config.fluid_type).unwrap(),
+            range: config.range,
+            fluid_type: config.fluid_type,
             interval: config.interval,
             dt: 0.0,
             particle: ActuatorParticle::new(&config.particle),
@@ -109,32 +86,31 @@ impl Actuator {
             Some(temperature) => temperature,
         };
 
-        let particle = SimulationParticle::new(position, velocity, temperature, self.fluid_type.clone(), self.particle.color);
+        let particle = SimulationParticle::new(
+            position,
+            velocity,
+            temperature,
+            self.fluid_type.clone(),
+            self.particle.color,
+        );
 
         Some(particle)
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SensorConfig {
-    label: char,
-    height: f32,
-    range: [f32; 3],
-}
-
 #[derive(Debug)]
 pub struct Sensor {
-    pub(crate) label: char,
     position: Vec3,
     range: Vec3,
+    output: Option<String>,
 }
 
 impl Sensor {
     pub fn new(x: f32, z: f32, config: &SensorConfig) -> Self {
         Self {
-            label: config.label,
             position: Vec3::new(x, config.height, z),
-            range: Vec3::from(config.range),
+            range: config.range,
+            output: config.output.clone(),
         }
     }
 
@@ -173,19 +149,14 @@ impl Tile {
 #[derive(Debug)]
 pub struct WorldMap {
     tiles: Vec<Vec<Tile>>,
-    config: DeviceConfig,
+    actuators: HashMap<char, Actuator>,
+    sensors: HashMap<char, Sensor>,
 }
 
 impl WorldMap {
-    pub fn from_file(filename: &str) -> Self {
-        let contents = fs::read_to_string(filename).expect("Unable to read map file");
-        let split_contents: Vec<&str> = contents.split("---").collect();
-        let map = split_contents.first().unwrap();
-        let map_config = split_contents.last().unwrap();
-        let config: DeviceConfig =
-            serde_json::from_str(map_config).expect("Unable to parse map file json");
-
-        let tiles = map
+    pub fn new(config: &Config) -> Self {
+        let tiles: Vec<Vec<Tile>> = config
+            .get_environment()
             .lines()
             .map(|line| {
                 line.chars()
@@ -194,7 +165,41 @@ impl WorldMap {
             })
             .collect();
 
-        Self { tiles, config }
+        let mut actuators = HashMap::new();
+        let mut sensors = HashMap::new();
+
+        tiles
+            .iter()
+            .enumerate()
+            .flat_map(|(z, row)| {
+                row.iter()
+                    .enumerate()
+                    .map(move |(x, tile)| (x as f32, z as f32, tile))
+            })
+            .for_each(|(x, z, tile)| match tile {
+                Tile::Device(c) => {
+                    match config.get_actuator_by_label(c) {
+                        Some(config) => {
+                            actuators.insert(*c, Actuator::new(x + 0.5, z + 0.5, config));
+                        }
+                        None => {}
+                    }
+
+                    match config.get_sensor_by_label(c) {
+                        Some(config) => {
+                            sensors.insert(*c, Sensor::new(x, z, config));
+                        }
+                        None => {}
+                    }
+                }
+                _ => {}
+            });
+
+        Self {
+            tiles,
+            actuators,
+            sensors,
+        }
     }
 
     pub fn build_scene(&mut self, renderer: &Renderer, pipeline: &wgpu::RenderPipeline) -> Scene {
@@ -202,32 +207,22 @@ impl WorldMap {
         let mut floor_instances = Vec::new();
         let mut wall_instances = Vec::new();
 
-        for (z, row) in self.tiles.iter().enumerate() {
-            for (x, tile) in row.iter().enumerate() {
-                let (x, z) = (x as f32, z as f32);
-
-                match tile {
-                    Tile::Empty => {}
-                    Tile::Wall => {
-                        let instance = Self::create_wall_instance(x, z);
-                        wall_instances.push(instance);
-                    }
-                    Tile::Floor => {
-                        let instance = Self::create_floor_instance(x, z);
-                        floor_instances.push(instance);
-                    }
-                    Tile::User => {
-                        user_position = (x, z);
-                        let instance = Self::create_floor_instance(x, z);
-                        floor_instances.push(instance);
-                    }
-                    Tile::Device(c) => {
-                        let instance = Self::create_floor_instance(x, z);
-                        floor_instances.push(instance);
-                    }
-                }
+        self.iter_tiles().for_each(|(x, z, tile)| match tile {
+            Tile::Empty => {}
+            Tile::Wall => {
+                let instance = Self::create_wall_instance(x, z);
+                wall_instances.push(instance);
             }
-        }
+            Tile::User => {
+                user_position = (x, z);
+                let instance = Self::create_floor_instance(x, z);
+                floor_instances.push(instance);
+            }
+            Tile::Floor | Tile::Device(_) => {
+                let instance = Self::create_floor_instance(x, z);
+                floor_instances.push(instance);
+            }
+        });
 
         Scene::new(
             renderer,
@@ -238,84 +233,33 @@ impl WorldMap {
         )
     }
 
-    pub fn get_actuators(&self) -> Vec<Actuator> {
-        let mut actuators = Vec::new();
-
-        for (z, row) in self.tiles.iter().enumerate() {
-            for (x, tile) in row.iter().enumerate() {
-                let (x, z) = (x as f32, z as f32);
-
-                match tile {
-                    Tile::Device(c) => {
-                        let actuator = self
-                            .config
-                            .actuators
-                            .iter()
-                            .filter(|config| config.label == *c)
-                            .next()
-                            .map(|config| Actuator::new(x + 0.5, z + 0.5, config));
-
-                        match actuator {
-                            Some(actuator) => {
-                                actuators.push(actuator);
-                            }
-                            None => {}
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        actuators
+    fn iter_tiles(&self) -> impl Iterator<Item = (f32, f32, &Tile)> {
+        self.tiles.iter().enumerate().flat_map(|(z, row)| {
+            row.iter()
+                .enumerate()
+                .map(move |(x, tile)| (x as f32, z as f32, tile))
+        })
     }
 
-    pub fn get_sensors(&self) -> Vec<Sensor> {
-        let mut sensors = Vec::new();
+    pub fn get_actuators(&mut self) -> &mut HashMap<char, Actuator> {
+        &mut self.actuators
+    }
 
-        for (z, row) in self.tiles.iter().enumerate() {
-            for (x, tile) in row.iter().enumerate() {
-                let (x, z) = (x as f32, z as f32);
-
-                match tile {
-                    Tile::Device(c) => {
-                        let sensors_by_label = self
-                            .config
-                            .sensors
-                            .iter()
-                            .filter(|s| s.label == *c)
-                            .map(|config| Sensor::new(x, z, config));
-
-                        sensors.extend(sensors_by_label);
-                        println!("sensors from {}: {:?}", c, sensors);
-                        // match sensor {
-                        //     Some(sensor) => {
-                        //         sensors.push(sensor);
-                        //     }
-                        //     None => {}
-                        // }
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        sensors
+    pub fn get_sensor_by_label(&self, label: &char) -> Option<&Sensor> {
+        self.sensors.get(label)
     }
 
     pub fn get_tile_in_position(&self, position: Vec3) -> &Tile {
         let (x, z) = ((position.x) as usize, (position.z) as usize);
 
-        if z <= self.tiles.len() {
-            if x <= self.tiles[z].len() {
-                let tile = &self.tiles[z][x];
+        if z <= self.tiles.len() && x <= self.tiles[z].len() {
+            let tile = &self.tiles[z][x];
 
-                return match tile {
-                    Tile::User => &Tile::Floor,
-                    Tile::Device(_) => &Tile::Floor,
-                    _ => tile,
-                };
-            }
+            return match tile {
+                Tile::User => &Tile::Floor,
+                Tile::Device(_) => &Tile::Floor,
+                _ => tile,
+            };
         }
 
         return &Tile::Empty;

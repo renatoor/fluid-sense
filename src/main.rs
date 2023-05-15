@@ -1,11 +1,21 @@
 extern crate core;
 
+use std::{env, fs};
+use std::time::Duration;
+
+use clap::Parser;
+use glam::{Mat4, Vec3, Vec4};
+use rand::Rng;
+use rand::rngs::ThreadRng;
+use serde::{Deserialize, Serialize};
+use winit::event::{ElementState, KeyboardInput, WindowEvent};
+
 use crate::app::App;
-use crate::cfd::sph::simulation::{ParticleConfig, SimulationParticle, SPH};
+use crate::cfd::sph::simulation::{SimulationParticle, SPH};
 use crate::gfx::buffer::VertexBuffer;
+use crate::gfx::camera::Camera;
 use crate::gfx::camera::controller::FirstPersonController;
 use crate::gfx::camera::projection::{Perspective, Projection};
-use crate::gfx::camera::Camera;
 use crate::gfx::light::Light;
 use crate::gfx::pipeline::Pipeline;
 use crate::gfx::renderer::Renderer;
@@ -13,15 +23,8 @@ use crate::gfx::texture::{DepthTexture, Texture};
 use crate::gfx::uniform::Uniform;
 use crate::scene::object::particle::{Particle, ParticleInstance};
 use crate::scene::object::plane::Plane;
-use crate::scene::world_map::{Actuator, Sensor, Tile, WorldMap};
 use crate::scene::Scene;
-use glam::{Mat4, Vec3, Vec4};
-use rand::rngs::ThreadRng;
-use rand::Rng;
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::time::Duration;
-use winit::event::{ElementState, KeyboardInput, WindowEvent};
+use crate::scene::world_map::{Actuator, Sensor, Tile, WorldMap};
 
 mod app;
 mod cfd;
@@ -112,69 +115,41 @@ struct FluidSense {
     particle: Particle,
     particle_instance_buffer: VertexBuffer,
     sph: SPH,
-    rng: ThreadRng,
-    actuators: Vec<Actuator>,
-    sensors: Vec<Sensor>,
+    // actuators: Vec<Actuator>,
+    // sensors: Vec<Sensor>,
+}
+
+#[derive(Parser, Debug)]
+struct Args {
+    #[arg(short, long)]
+    config: String,
+    #[arg(long, default_value_t = false)]
+    headless: bool,
 }
 
 impl App for FluidSense {
     fn init(renderer: &mut Renderer) -> Self {
-        let depth_texture = DepthTexture::new(renderer);
-
-        renderer.set_depth_texture(depth_texture);
-
+        let args = Args::parse();
         let phong_pipeline = Pipeline::phong(renderer);
         let particle_pipeline = Pipeline::particle(renderer);
-
-        let mut world_map = WorldMap::from_file("./assets/maps/default.txt");
-
+        let config = cfd::config::Config::new(&args.config);
+        let mut world_map = WorldMap::new(&config);
         let scene = world_map.build_scene(renderer, &phong_pipeline);
         let (x, z) = scene.user_position();
-
         let projection = Perspective::new(45.0, renderer.get_aspect_ratio(), 0.1, 1000.0);
+
         let camera = Camera::new(
             &renderer,
             &phong_pipeline,
             Vec3::new(x, 1.65, z),
             projection,
         );
+
         let camera_controller = FirstPersonController::new(0.0, 90.0, 4.0, 0.1);
-
         let light = Light::new(&renderer, &phong_pipeline, camera.position(), Vec3::ONE);
-
         let particle = Particle::new(renderer);
-
-        let rng = rand::thread_rng();
-
-        let config_file = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/config.json");
-
-        let config_str = fs::read_to_string(config_file).expect("Config file not found");
-
-        let config: Config = serde_json::from_str(&config_str).expect("Unable to parse json");
-
-        let particle_config = ParticleConfig {
-            radius: config.radius,
-            mass: config.mass,
-            gas_constant: config.gas_constant,
-            rest_density: config.rest_density,
-            thermal_conductivity: config.thermal_conductivity,
-            small_positive: config.small_positive,
-            viscosity: config.viscosity,
-            damping_coefficient: config.damping_coefficient,
-            damping_threshold: config.damping_threshold,
-            radiation_half_life: config.radiation_half_life,
-            buoyancy_coefficient: config.buoyancy_coefficient,
-            buoyancy_direction: Vec3::from(config.buoyancy_direction),
-            gravity: Vec3::from(config.gravity),
-            virtual_particle: Vec3::from(config.virtual_particle),
-        };
-
-        let sph = SPH::new(particle_config);
-
+        let sph = SPH::new(&config);
         let particle_instance_buffer = VertexBuffer::new(renderer, sph.get_particle_instances());
-
-        let actuators = world_map.get_actuators();
-        let sensors = world_map.get_sensors();
 
         Self {
             phong_pipeline,
@@ -187,9 +162,6 @@ impl App for FluidSense {
             particle,
             particle_instance_buffer,
             sph,
-            rng,
-            actuators,
-            sensors,
         }
     }
 
@@ -207,27 +179,25 @@ impl App for FluidSense {
         self.sph.step(0.001);
         self.sph.check_particles(&self.world_map);
 
-        for mut actuator in &mut self.actuators {
-            match actuator.emit_particle(&dt) {
+        self.world_map
+            .get_actuators()
+            .iter_mut()
+            .for_each(|(_, actuator)| match actuator.emit_particle(&dt) {
                 None => {}
                 Some(particle) => {
                     self.sph.add_particle(particle);
                 }
-            }
-        }
+            });
 
-        for particle in self.sph.get_particles() {
+        self.sph.get_particles().iter().for_each(|particle| {
             match self.world_map.get_device_in_position(particle.position) {
+                Some(label) => match self.world_map.get_sensor_by_label(&label) {
+                    Some(sensor) => sensor.inspect_particle(particle),
+                    None => {}
+                },
                 None => {}
-                Some(label) => {
-                    let sensors = self.sensors.iter().filter(|sensor| sensor.label == label).collect::<Vec<&Sensor>>();
-
-                    for sensor in sensors {
-                        sensor.inspect_particle(particle);
-                    }
-                }
             }
-        }
+        })
     }
 
     fn resize(&mut self, width: u32, height: u32) {
@@ -252,11 +222,18 @@ impl App for FluidSense {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    app::run::<FluidSense>().await;
+//#[tokio::main]
+fn main() {
+    let args = Args::parse();
+
+    if args.headless {
+        todo!();
+    } else {
+        pollster::block_on(app::run::<FluidSense>());
+    }
 }
 
+/*
 fn main2() {
     let mut world_map = WorldMap::from_file("./assets/maps/default.txt");
     let config_file = concat!(env!("CARGO_MANIFEST_DIR"), "/assets/config.json");
@@ -306,7 +283,10 @@ fn main2() {
             match world_map.get_device_in_position(particle.position) {
                 None => {}
                 Some(label) => {
-                    let sensors = sensors.iter().filter(|sensor| sensor.label == label).collect::<Vec<&Sensor>>();
+                    let sensors = sensors
+                        .iter()
+                        .filter(|sensor| sensor.label == label)
+                        .collect::<Vec<&Sensor>>();
 
                     for sensor in sensors {
                         sensor.inspect_particle(particle);
@@ -316,3 +296,4 @@ fn main2() {
         }
     }
 }
+ */

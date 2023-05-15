@@ -1,10 +1,12 @@
-use crate::cfd::sph::kernel::Kernel;
-use crate::{Particle, ParticleInstance, Tile, WorldMap};
-use glam::Vec3;
 use std::collections::LinkedList;
 use std::time::Duration;
+
+use glam::Vec3;
 use rayon::prelude::*;
-use crate::scene::world_map::FluidType;
+
+use crate::{Particle, ParticleInstance, Tile, WorldMap};
+use crate::cfd::config::{Config, FluidType, SimulationConfig};
+use crate::cfd::sph::kernel::Kernel;
 
 #[derive(Debug)]
 pub struct SimulationParticle {
@@ -20,7 +22,13 @@ pub struct SimulationParticle {
 }
 
 impl SimulationParticle {
-    pub fn new(position: Vec3, velocity: Vec3, temperature: f32, fluid_type: FluidType, color: Vec3) -> Self {
+    pub fn new(
+        position: Vec3,
+        velocity: Vec3,
+        temperature: f32,
+        fluid_type: FluidType,
+        color: Vec3,
+    ) -> Self {
         Self {
             position,
             velocity,
@@ -35,32 +43,16 @@ impl SimulationParticle {
     }
 }
 
-pub struct ParticleConfig {
-    pub radius: f32,
-    pub mass: f32,
-    pub gas_constant: f32,
-    pub rest_density: f32,
-    pub thermal_conductivity: f32,
-    pub small_positive: f32,
-    pub viscosity: f32,
-    pub damping_coefficient: f32,
-    pub damping_threshold: f32,
-    pub radiation_half_life: f32,
-    pub buoyancy_coefficient: f32,
-    pub buoyancy_direction: Vec3,
-    pub gravity: Vec3,
-    pub virtual_particle: Vec3,
-}
-
 pub struct SPH {
     kernel: Kernel,
     particles: Vec<SimulationParticle>,
     instances: Vec<ParticleInstance>,
-    config: ParticleConfig,
+    config: SimulationConfig,
 }
 
 impl SPH {
-    pub fn new(config: ParticleConfig) -> Self {
+    pub fn new(config: &Config) -> Self {
+        let config = config.get_simulation_config().clone();
         let kernel = Kernel::new(config.radius);
         let particles = Vec::new();
         let instances = Vec::new();
@@ -77,10 +69,7 @@ impl SPH {
         let position = particle.position.clone();
         let color = particle.color.clone();
         self.particles.push(particle);
-        self.instances.push(ParticleInstance {
-            position,
-            color,
-        });
+        self.instances.push(ParticleInstance { position, color });
     }
 
     pub fn remove_particle(&mut self, index: usize) {
@@ -93,22 +82,20 @@ impl SPH {
     }
 
     pub fn check_particles(&mut self, world_map: &WorldMap) {
-        let mut particle_indices = Vec::new();
-        for (i, particle) in self.particles.iter().enumerate() {
-            if particle.position.y > 3.0 || particle.position.y < 0.0 {
-                particle_indices.push(i);
-                continue;
-            }
-
-            match world_map.get_tile_in_position(particle.position) {
-                Tile::Floor => {}
-                _ => particle_indices.push(i),
-            }
-        }
-
-        for i in particle_indices {
-            self.remove_particle(i);
-        }
+        self.particles
+            .iter()
+            .enumerate()
+            .filter(
+                |(_, particle)| match world_map.get_tile_in_position(particle.position) {
+                    Tile::Floor => particle.position.y > 3.0 || particle.position.y < 0.0,
+                    _ => true,
+                },
+            )
+            .map(|(idx, _)| idx)
+            .collect::<Vec<_>>()
+            .iter()
+            .rev()
+            .for_each(|idx| self.remove_particle(*idx));
     }
 
     pub fn get_particle_instances(&self) -> &Vec<ParticleInstance> {
@@ -216,24 +203,26 @@ impl SPH {
                                 * ((pressure_i + pressure_j) / 2.0)
                                 * self.kernel.spiky_grad_w(diff)
                                 + (self.config.mass / pi.density_correction)
-                                * ((pressure_i + pressure_k) / 2.0)
-                                * self.kernel.spiky_grad_w(self.config.virtual_particle);
+                                    * ((pressure_i + pressure_k) / 2.0)
+                                    * self.kernel.spiky_grad_w(self.config.virtual_particle);
 
-                            viscosity += self.config.mass * (pj.velocity - pi.velocity) / pj.density
+                            viscosity += self.config.mass * (pj.velocity - pi.velocity)
+                                / pj.density
                                 * self.kernel.viscosity_laplacian_w(diff);
 
                             temperature += (self.config.mass / (pressure_i * pressure_j))
                                 * self.config.thermal_conductivity
                                 * (pi.temperature - pj.temperature)
                                 * (diff.dot(self.kernel.spiky_grad_w(diff))
-                                / (diff.dot(diff) + self.config.small_positive));
+                                    / (diff.dot(diff) + self.config.small_positive));
                         }
                         FluidType::Liquid => {
                             pressure -= (self.config.mass / pj.density)
                                 * ((pressure_i + pressure_j) / 2.0)
                                 * self.kernel.spiky_grad_w(diff);
 
-                            viscosity += self.config.mass * (pj.velocity - pi.velocity) / pj.density
+                            viscosity += self.config.mass * (pj.velocity - pi.velocity)
+                                / pj.density
                                 * self.kernel.viscosity_laplacian_w(diff);
                         }
                     }
@@ -251,8 +240,9 @@ impl SPH {
 
                     pi.temperature += temperature;
 
-                    let buoyancy =
-                        self.config.buoyancy_coefficient * pi.temperature * self.config.buoyancy_direction;
+                    let buoyancy = self.config.buoyancy_coefficient
+                        * pi.temperature
+                        * self.config.buoyancy_direction;
 
                     pi.forces = (pressure + 1.0 * atmospheric_pressure)
                         + viscosity

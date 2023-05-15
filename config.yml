@@ -1,0 +1,51 @@
+environment: |
+  #########
+  #......a#
+  #.......#
+  #.@.....#
+  #.......#
+  #......b#
+  #########
+actuators:
+  a:
+    height: 1.5
+    direction: [-1.0, 0.0, 1.0]
+    initial_velocity: 5.0
+    temperature: 25.0
+    range: [0.2, 0.2, 0.2]
+    fluid_type: Gaseous
+    interval: 0.05
+    particle:
+      size: 0.2
+      color: [0.0, 0.0, 1.0]
+  b:
+    height: 1.5
+    direction: [-1.0, 0.0, -1.0]
+    initial_velocity: 5.0
+    range: [0.2, 0.2, 0.2]
+    fluid_type: Gaseous
+    interval: 0.05
+    particle:
+      size: 0.2
+      color: [1.0, 0.0, 0.0]
+sensors:
+  b:
+    height: 1.0
+    range: [10.0, 1.0, 1.0]
+    output: "nomedoarquivo.csv"
+simulation:
+  step: 0.001
+  radius: 0.0457
+  mass: 0.02
+  gas_constant: 3.0
+  rest_density: 0.99829
+  thermal_conductivity: 0.598
+  small_positive: 0.0001
+  viscosity: 0.01
+  damping_coefficient: 100.0
+  damping_threshold: 1.0
+  radiation_half_life: 1000.0
+  buoyancy_coefficient: 0.8
+  buoyancy_direction: [0.0, 1.0, 0.0]
+  gravity: [0.0, -9.82, 0.0]
+  virtual_particle: [0.0, 0.01828, 0.0]
