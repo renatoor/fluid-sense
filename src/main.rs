@@ -125,12 +125,7 @@ impl App for FluidSense {
         self.camera.resize(width, height);
     }
 
-    fn render(&self, renderer: &Renderer) -> Result<(), wgpu::SurfaceError> {
-        renderer.render(&self.phong_pipeline, &self.camera, &self.scene, &self.light)?;
-        Ok(())
-    }
-
-    fn render2<'a>(&'a mut self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>) {
+    fn render<'a>(&'a mut self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&self.phong_pipeline);
         self.camera.update(&renderer, render_pass);
         self.light.update(&renderer, render_pass);
