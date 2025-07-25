@@ -1,4 +1,4 @@
-use crate::{Pipeline, Renderer};
+use crate::Renderer;
 use glam::{Vec3, Vec4};
 
 #[repr(C)]

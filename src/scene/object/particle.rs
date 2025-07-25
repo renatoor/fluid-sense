@@ -31,6 +31,7 @@ impl Vertex for ParticleVertex {
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ParticleInstance {
     pub position: Vec3,
+    pub size: f32,
     pub color: Vec3,
 }
 
@@ -48,6 +49,11 @@ impl Vertex for ParticleInstance {
                 wgpu::VertexAttribute {
                     offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     shader_location: 2,
+                    format: wgpu::VertexFormat::Float32,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 3,
                     format: wgpu::VertexFormat::Float32x3,
                 },
             ],
@@ -101,22 +107,10 @@ impl Particle {
         },
     ];
 
-    //const VERTICES: [f32; 12] = [
-    //    -0.5, -0.5, 0.0,
-    //    0.5, -0.5, 0.0,
-    //    -0.5, 0.5, 0.0,
-    //    0.5, 0.5, 0.0,
-    //];
-
     pub fn new(renderer: &Renderer) -> Self {
         let vertex_buffer = VertexBuffer::new(renderer, &Self::VERTICES);
 
         Self { vertex_buffer }
-    }
-
-    pub fn draw<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.draw(0..self.vertex_buffer.len(), 0..1);
     }
 
     pub fn draw_instanced<'a>(

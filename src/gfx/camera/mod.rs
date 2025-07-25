@@ -1,5 +1,5 @@
 use crate::gfx::camera::projection::Projection;
-use crate::{Pipeline, Renderer};
+use crate::Renderer;
 use glam::{Mat4, Vec3, Vec4};
 use wgpu::RenderPass;
 
@@ -79,10 +79,6 @@ impl<T: Projection> Camera<T> {
 
     pub fn view(&self) -> Mat4 {
         Mat4::look_at_rh(self.eye, self.center, self.up)
-    }
-
-    pub fn projection(&self) -> Mat4 {
-        self.projection_matrix
     }
 
     pub fn position(&self) -> Vec3 {

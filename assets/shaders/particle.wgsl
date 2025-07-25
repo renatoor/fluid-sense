@@ -13,7 +13,8 @@ struct VertexInput {
 
 struct Instance {
     @location(1) position: vec3<f32>,
-    @location(2) color: vec3<f32>,
+    @location(2) size: f32,
+    @location(3) color: vec3<f32>,
 }
 
 struct VertexOutput {
@@ -25,7 +26,7 @@ struct VertexOutput {
 fn vs_main(model: VertexInput, instance: Instance) -> VertexOutput {
     let camera_right: vec3<f32> = vec3<f32>(camera.view_matrix[0].x, camera.view_matrix[1].x, camera.view_matrix[2].x);
     let camera_up: vec3<f32> = vec3<f32>(camera.view_matrix[0].y, camera.view_matrix[1].y, camera.view_matrix[2].y);
-    let position_world: vec3<f32> = instance.position + camera_right * model.position.x * 0.02 + camera_up * model.position.y * 0.02;
+    let position_world: vec3<f32> = instance.position + camera_right * model.position.x * instance.size + camera_up * model.position.y * instance.size;
     var out: VertexOutput;
     var screenspace: vec4<f32> = camera.view_projection * vec4<f32>(position_world, 1.0);
     out.clip_position = screenspace;

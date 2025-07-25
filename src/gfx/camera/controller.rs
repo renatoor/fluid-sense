@@ -1,5 +1,5 @@
 use crate::gfx::camera::projection::Projection;
-use crate::{Camera, Tile, WorldMap};
+use crate::Camera;
 use glam::Vec3;
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
@@ -39,8 +39,8 @@ impl FirstPersonController {
                 VirtualKeyCode::A => self.movement.1 = 1.0,
                 VirtualKeyCode::S => self.movement.2 = 1.0,
                 VirtualKeyCode::D => self.movement.3 = 1.0,
-                VirtualKeyCode::LShift => self.movement.4 = 1.0,
-                VirtualKeyCode::Space => self.movement.5 = 1.0,
+                VirtualKeyCode::Space => self.movement.4 = 1.0,
+                VirtualKeyCode::LShift => self.movement.5 = 1.0,
                 _ => {}
             },
             KeyboardInput {
@@ -52,8 +52,8 @@ impl FirstPersonController {
                 VirtualKeyCode::A => self.movement.1 = 0.0,
                 VirtualKeyCode::S => self.movement.2 = 0.0,
                 VirtualKeyCode::D => self.movement.3 = 0.0,
-                VirtualKeyCode::LShift => self.movement.4 = 0.0,
-                VirtualKeyCode::Space => self.movement.5 = 0.0,
+                VirtualKeyCode::Space => self.movement.4 = 0.0,
+                VirtualKeyCode::LShift => self.movement.5 = 0.0,
                 _ => {}
             },
             _ => {}

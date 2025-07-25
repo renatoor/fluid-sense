@@ -1,11 +1,8 @@
-use crate::gfx::camera::projection::Projection;
-use crate::gfx::pipeline::Pipeline;
-use crate::gfx::texture::Texture;
-use crate::{App, Camera, DepthTexture, Light, Scene};
+use crate::{App, DepthTexture};
 use bytemuck::{Pod, Zeroable};
-use glam::{Mat4, Quat, Vec3};
+
 use wgpu::util::DeviceExt;
-use wgpu::BindingResource;
+
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
@@ -58,7 +55,7 @@ impl Renderer {
 
         surface.configure(&device, &config);
 
-        Self {
+        let mut renderer = Renderer {
             size,
             surface,
             device,
@@ -66,11 +63,12 @@ impl Renderer {
             config,
             clear_color,
             depth_texture: None,
-        }
-    }
+        };
 
-    pub fn device(&self) -> &wgpu::Device {
-        &self.device
+        let depth_texture = DepthTexture::new(&renderer);
+        renderer.set_depth_texture(depth_texture);
+
+        renderer
     }
 
     #[allow(dead_code)]
@@ -146,72 +144,7 @@ impl Renderer {
         self.device.create_shader_module(desc)
     }
 
-    pub fn create_render_pipeline(
-        &self,
-        desc: &wgpu::RenderPipelineDescriptor,
-    ) -> wgpu::RenderPipeline {
-        self.device.create_render_pipeline(desc)
-    }
-
-    pub fn render<T: Projection>(
-        &self,
-        pipeline: &wgpu::RenderPipeline,
-        camera: &Camera<T>,
-        scene: &Scene,
-        light: &Light,
-    ) -> Result<(), wgpu::SurfaceError>
-    where
-        T: Projection,
-    {
-        let output = self.surface.get_current_texture()?;
-
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor::default());
-
-        {
-            let depth_stencil_attachment = match &self.depth_texture {
-                Some(depth_texture) => Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: depth_texture.get_view(),
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
-                    }),
-                    stencil_ops: None,
-                }),
-                None => None,
-            };
-
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: None,
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(self.clear_color),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment,
-            });
-
-            render_pass.set_pipeline(&pipeline);
-            camera.update(&self, &mut render_pass);
-            light.update(&self, &mut render_pass);
-            scene.draw_mesh(&mut render_pass);
-        }
-
-        self.queue.submit(std::iter::once(encoder.finish()));
-        output.present();
-
-        Ok(())
-    }
-
-    pub fn render_fn<T>(&self, app: &mut T) -> Result<(), wgpu::SurfaceError>
+    pub fn render<T>(&self, app: &mut T) -> Result<(), wgpu::SurfaceError>
     where
         T: App,
     {
@@ -251,7 +184,7 @@ impl Renderer {
                 depth_stencil_attachment,
             });
 
-            app.render2(&self, &mut render_pass);
+            app.render(&self, &mut render_pass);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));

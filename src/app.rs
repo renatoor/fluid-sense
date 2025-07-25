@@ -1,7 +1,8 @@
 use crate::gfx::renderer::Renderer;
+
 use std::time::{Duration, Instant};
-use winit::dpi::{PhysicalPosition, PhysicalSize};
-use winit::platform::unix::WindowBuilderExtUnix;
+use winit::dpi::PhysicalPosition;
+//use winit::platform::unix::WindowBuilderExtUnix;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -14,20 +15,19 @@ pub trait App: 'static + Sized {
     fn mouse_movement(&mut self, dx: f32, dy: f32);
     fn update(&mut self, dt: Duration);
     fn resize(&mut self, width: u32, height: u32);
-    fn render(&self, renderer: &Renderer) -> Result<(), wgpu::SurfaceError>;
-    fn render2<'a>(&'a mut self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>);
+    fn render<'a>(&'a mut self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>);
 }
 
 pub async fn run<A: App>() {
     env_logger::init();
 
-    let window_instance = "fluid-sense".to_string();
-    let window_class = "fluid-sense".to_string();
+    // let window_instance = "fluid-sense".to_string();
+    // let window_class = "fluid-sense".to_string();
 
     let event_loop = EventLoop::new();
 
     let window = WindowBuilder::new()
-        .with_class(window_instance, window_class)
+        //.with_class(window_instance, window_class)
         .build(&event_loop)
         .unwrap();
 
@@ -90,8 +90,7 @@ pub async fn run<A: App>() {
 
             app.update(dt);
 
-            //match app.render(&renderer) {
-            match renderer.render_fn(&mut app) {
+            match renderer.render(&mut app) {
                 Ok(_) => {}
                 Err(wgpu::SurfaceError::Lost) => renderer.configure_surface(),
                 Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
