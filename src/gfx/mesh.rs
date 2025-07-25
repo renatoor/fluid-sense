@@ -2,22 +2,10 @@ use crate::gfx::buffer::{IndexBuffer, VertexBuffer};
 use crate::gfx::texture::Texture;
 use crate::gfx::vertex::ModelVertex;
 use crate::Renderer;
-use bytemuck::{Pod, Zeroable};
-use glam::Vec3;
 
 pub struct Model {
     pub vertices: Vec<ModelVertex>,
     pub indices: Option<Vec<u16>>,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, Pod, Zeroable)]
-pub struct Material {
-    pub ambient: Vec3,
-    pub diffuse: Vec3,
-    pub specular: Vec3,
-    pub shininess: f32,
-    pub padding: [u32; 2],
 }
 
 pub struct Mesh {

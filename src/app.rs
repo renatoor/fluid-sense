@@ -2,7 +2,7 @@ use crate::gfx::renderer::Renderer;
 
 use std::time::{Duration, Instant};
 use winit::dpi::PhysicalPosition;
-use winit::platform::unix::WindowBuilderExtUnix;
+//use winit::platform::unix::WindowBuilderExtUnix;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -21,13 +21,13 @@ pub trait App: 'static + Sized {
 pub async fn run<A: App>() {
     env_logger::init();
 
-    let window_instance = "fluid-sense".to_string();
-    let window_class = "fluid-sense".to_string();
+    // let window_instance = "fluid-sense".to_string();
+    // let window_class = "fluid-sense".to_string();
 
     let event_loop = EventLoop::new();
 
     let window = WindowBuilder::new()
-        .with_class(window_instance, window_class)
+        //.with_class(window_instance, window_class)
         .build(&event_loop)
         .unwrap();
 

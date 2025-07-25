@@ -2,9 +2,6 @@ use crate::Renderer;
 use image::GenericImageView;
 
 pub struct Texture {
-    pub texture: wgpu::Texture,
-    pub view: wgpu::TextureView,
-    pub sampler: wgpu::Sampler,
     pub bind_group: wgpu::BindGroup,
     pub index: u32,
 }
@@ -97,9 +94,6 @@ impl Texture {
             });
 
         Self {
-            texture,
-            view,
-            sampler,
             bind_group,
             index,
         }
