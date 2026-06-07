@@ -118,6 +118,10 @@ impl Particle {
         render_pass: &mut wgpu::RenderPass<'a>,
         instance_buffer: &'a VertexBuffer,
     ) {
+        if instance_buffer.len() == 0 {
+            return;
+        }
+
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
         //render_pass.draw_indexed(0..self.index_buffer.len(), 0, 0..instance_buffer.len());

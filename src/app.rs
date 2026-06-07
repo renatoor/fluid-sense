@@ -1,105 +1,220 @@
-use crate::gfx::renderer::Renderer;
+use crate::gfx::renderer::{RenderStatus, Renderer};
 
+use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-use winit::dpi::PhysicalPosition;
-//use winit::platform::unix::WindowBuilderExtUnix;
-use winit::{
-    event::*,
-    event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
-};
+use winit::application::ApplicationHandler;
+use winit::dpi::{LogicalPosition, LogicalSize};
+use winit::event::{ElementState, KeyEvent, StartCause, WindowEvent};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::{KeyCode, PhysicalKey};
+use winit::window::{UserAttentionType, Window, WindowId};
+
+#[cfg(target_os = "macos")]
+use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 
 pub trait App: 'static + Sized {
     fn init(renderer: &mut Renderer) -> Self;
-    fn keyboard_input(&mut self, input: KeyboardInput);
+    fn keyboard_input(&mut self, input: &KeyEvent);
     fn mouse_movement(&mut self, dx: f32, dy: f32);
     fn update(&mut self, dt: Duration);
     fn resize(&mut self, width: u32, height: u32);
     fn render<'a>(&'a mut self, renderer: &Renderer, render_pass: &mut wgpu::RenderPass<'a>);
 }
 
-pub async fn run<A: App>() {
-    env_logger::init();
+struct Runner<A: App> {
+    window: Option<Arc<Window>>,
+    renderer: Option<Renderer>,
+    app: Option<A>,
+    last_update: Instant,
+    logged_first_frame: bool,
+    logged_event_loop: bool,
+    last_cursor_position: Option<(f64, f64)>,
+    _marker: PhantomData<A>,
+}
 
-    // let window_instance = "fluid-sense".to_string();
-    // let window_class = "fluid-sense".to_string();
-
-    let event_loop = EventLoop::new();
-
-    let window = WindowBuilder::new()
-        //.with_class(window_instance, window_class)
-        .build(&event_loop)
-        .unwrap();
-
-    let mut renderer = Renderer::new(&window).await;
-
-    let mut app = A::init(&mut renderer);
-    let mut last_update = Instant::now();
-
-    let size = window.inner_size();
-    let window_center = PhysicalPosition::new((size.width / 2) as i32, (size.height / 2) as i32);
-
-    window.set_cursor_position(window_center).unwrap();
-    window.set_cursor_grab(true).unwrap();
-    window.set_cursor_visible(false);
-
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::WindowEvent {
-            ref event,
-            window_id,
-        } if window_id == window.id() => match event {
-            WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        state: ElementState::Pressed,
-                        virtual_keycode: Some(VirtualKeyCode::Escape),
-                        ..
-                    },
-                ..
-            } => *control_flow = ControlFlow::Exit,
-            WindowEvent::Resized(physical_size) => {
-                app.resize((*physical_size).width, (*physical_size).height);
-                renderer.resize(*physical_size);
-            }
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                app.resize((**new_inner_size).width, (**new_inner_size).height);
-                renderer.resize(**new_inner_size);
-            }
-            _ => {}
-        },
-        Event::DeviceEvent {
-            event: DeviceEvent::MouseMotion { delta: (dx, dy) },
-            ..
-        } => {
-            app.mouse_movement(dx as f32, dy as f32);
-
-            window.set_cursor_position(window_center).unwrap();
+impl<A: App> Default for Runner<A> {
+    fn default() -> Self {
+        Self {
+            window: None,
+            renderer: None,
+            app: None,
+            last_update: Instant::now(),
+            logged_first_frame: false,
+            logged_event_loop: false,
+            last_cursor_position: None,
+            _marker: PhantomData,
         }
-        Event::DeviceEvent {
-            event: DeviceEvent::Key(input),
-            ..
-        } => {
-            app.keyboard_input(input);
-        }
-        Event::RedrawRequested(window_id) if window_id == window.id() => {
-            let now = Instant::now();
-            let dt = now - last_update;
+    }
+}
 
-            last_update = now;
+impl<A: App> Runner<A> {
+    fn window_id(&self) -> Option<WindowId> {
+        self.window.as_ref().map(|window| window.id())
+    }
 
-            app.update(dt);
-
-            match renderer.render(&mut app) {
-                Ok(_) => {}
-                Err(wgpu::SurfaceError::Lost) => renderer.configure_surface(),
-                Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                Err(e) => eprintln!("{:?}", e),
-            }
-        }
-        Event::MainEventsCleared => {
+    fn request_redraw(&self) {
+        if let Some(window) = &self.window {
             window.request_redraw();
         }
-        _ => {}
-    });
+    }
+
+    fn handle_resize(&mut self, width: u32, height: u32) {
+        if width == 0 || height == 0 {
+            return;
+        }
+
+        if let Some(app) = self.app.as_mut() {
+            app.resize(width, height);
+        }
+
+        if let Some(renderer) = self.renderer.as_mut() {
+            renderer.resize((width, height).into());
+        }
+    }
+}
+
+impl<A: App> ApplicationHandler for Runner<A> {
+    fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
+        if cause == StartCause::Init && !self.logged_event_loop {
+            eprintln!("fluid-sense: event loop started");
+            self.logged_event_loop = true;
+        }
+    }
+
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_some() {
+            return;
+        }
+
+        eprintln!("fluid-sense: creating window");
+        let attrs = Window::default_attributes()
+            .with_title("fluid-sense")
+            .with_inner_size(LogicalSize::new(1280.0, 720.0))
+            .with_position(LogicalPosition::new(80.0, 80.0))
+            .with_visible(false);
+        let window = Arc::new(event_loop.create_window(attrs).unwrap());
+        eprintln!("fluid-sense: window created");
+
+        let mut renderer = pollster::block_on(Renderer::new(Arc::clone(&window)));
+        eprintln!("fluid-sense: renderer initialized");
+
+        let app = A::init(&mut renderer);
+        eprintln!("fluid-sense: app initialized");
+
+        window.set_visible(true);
+        window.request_user_attention(Some(UserAttentionType::Critical));
+        window.request_redraw();
+        eprintln!("fluid-sense: window shown");
+
+        self.last_update = Instant::now();
+        self.window = Some(window);
+        self.renderer = Some(renderer);
+        self.app = Some(app);
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        if Some(window_id) != self.window_id() {
+            return;
+        }
+
+        match event {
+            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::KeyboardInput { event, .. } => {
+                if event.state == ElementState::Pressed
+                    && event.physical_key == PhysicalKey::Code(KeyCode::Escape)
+                {
+                    event_loop.exit();
+                    return;
+                }
+
+                if let Some(app) = self.app.as_mut() {
+                    app.keyboard_input(&event);
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                if let Some((last_x, last_y)) = self.last_cursor_position {
+                    if let Some(app) = self.app.as_mut() {
+                        app.mouse_movement(
+                            (position.x - last_x) as f32,
+                            (position.y - last_y) as f32,
+                        );
+                    }
+                }
+                self.last_cursor_position = Some((position.x, position.y));
+            }
+            WindowEvent::CursorLeft { .. } | WindowEvent::Focused(false) => {
+                self.last_cursor_position = None;
+            }
+            WindowEvent::Resized(physical_size) => {
+                self.handle_resize(physical_size.width, physical_size.height);
+            }
+            WindowEvent::ScaleFactorChanged { .. } => {
+                if let Some(window) = &self.window {
+                    let size = window.inner_size();
+                    self.handle_resize(size.width, size.height);
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                let now = Instant::now();
+                let dt = now - self.last_update;
+                self.last_update = now;
+
+                let Some(app) = self.app.as_mut() else {
+                    return;
+                };
+                let Some(renderer) = self.renderer.as_mut() else {
+                    return;
+                };
+
+                app.update(dt);
+
+                match renderer.render(app) {
+                    RenderStatus::Rendered => {
+                        if !self.logged_first_frame {
+                            eprintln!(
+                                "fluid-sense window is rendering at {}x{}",
+                                renderer.get_size().0,
+                                renderer.get_size().1
+                            );
+                            self.logged_first_frame = true;
+                        }
+                    }
+                    RenderStatus::Reconfigure => renderer.configure_surface(),
+                    RenderStatus::Skip => {}
+                    RenderStatus::Failed(message) => eprintln!("{}", message),
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        self.request_redraw();
+    }
+}
+
+pub fn run<A: App>() {
+    eprintln!("fluid-sense: starting gui");
+    env_logger::init();
+
+    eprintln!("fluid-sense: creating event loop");
+    let mut event_loop_builder = EventLoop::builder();
+
+    #[cfg(target_os = "macos")]
+    event_loop_builder
+        .with_activation_policy(ActivationPolicy::Regular)
+        .with_activate_ignoring_other_apps(true);
+
+    let event_loop = event_loop_builder.build().unwrap();
+    event_loop.set_control_flow(ControlFlow::Poll);
+    eprintln!("fluid-sense: event loop created");
+
+    let mut runner = Runner::<A>::default();
+    event_loop.run_app(&mut runner).unwrap();
 }

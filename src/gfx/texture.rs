@@ -46,20 +46,21 @@ impl Texture {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
         });
 
         renderer.queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             &rgba,
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
-                bytes_per_row: std::num::NonZeroU32::new(4 * dimensions.0),
-                rows_per_image: std::num::NonZeroU32::new(dimensions.1),
+                bytes_per_row: Some(4 * dimensions.0),
+                rows_per_image: Some(dimensions.1),
             },
             size,
         );
@@ -72,7 +73,7 @@ impl Texture {
             address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Linear,
             min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
 
@@ -93,10 +94,7 @@ impl Texture {
                 ],
             });
 
-        Self {
-            bind_group,
-            index,
-        }
+        Self { bind_group, index }
     }
 
     pub fn bind<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
@@ -121,6 +119,7 @@ impl DepthTexture {
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
         });
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor::default());

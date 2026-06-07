@@ -1,14 +1,22 @@
 use crate::{App, DepthTexture};
 use bytemuck::{Pod, Zeroable};
 
+use std::sync::Arc;
 use wgpu::util::DeviceExt;
 
 use winit::dpi::PhysicalSize;
 use winit::window::Window;
 
+pub enum RenderStatus {
+    Rendered,
+    Reconfigure,
+    Skip,
+    Failed(&'static str),
+}
+
 pub struct Renderer {
     size: PhysicalSize<u32>,
-    surface: wgpu::Surface,
+    surface: wgpu::Surface<'static>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
@@ -17,10 +25,10 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub async fn new(window: &Window) -> Self {
+    pub async fn new(window: Arc<Window>) -> Self {
         let size = window.inner_size();
-        let instance = wgpu::Instance::new(wgpu::Backends::all());
-        let surface = unsafe { instance.create_surface(&window) };
+        let instance = wgpu::Instance::default();
+        let surface = instance.create_surface(window).unwrap();
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -32,24 +40,21 @@ impl Renderer {
             .unwrap();
 
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: None,
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
-                },
-                None,
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: None,
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                memory_hints: wgpu::MemoryHints::Performance,
+                trace: wgpu::Trace::Off,
+            })
             .await
             .unwrap();
 
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface.get_supported_formats(&adapter)[0],
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Fifo,
-        };
+        let width = size.width.max(1);
+        let height = size.height.max(1);
+        let mut config = surface.get_default_config(&adapter, width, height).unwrap();
+        config.present_mode = wgpu::PresentMode::Fifo;
 
         let clear_color = wgpu::Color::WHITE;
 
@@ -87,10 +92,14 @@ impl Renderer {
     }
 
     pub fn get_aspect_ratio(&self) -> f32 {
-        self.size.width as f32 / self.size.height as f32
+        self.size.width as f32 / self.size.height.max(1) as f32
     }
 
     pub fn resize(&mut self, new_size: PhysicalSize<u32>) {
+        if new_size.width == 0 || new_size.height == 0 {
+            return;
+        }
+
         self.size = new_size;
         self.config.width = new_size.width;
         self.config.height = new_size.height;
@@ -144,11 +153,24 @@ impl Renderer {
         self.device.create_shader_module(desc)
     }
 
-    pub fn render<T>(&self, app: &mut T) -> Result<(), wgpu::SurfaceError>
+    pub fn render<T>(&self, app: &mut T) -> RenderStatus
     where
         T: App,
     {
-        let output = self.surface.get_current_texture()?;
+        let output = self.surface.get_current_texture();
+        let output = match output {
+            wgpu::CurrentSurfaceTexture::Success(output)
+            | wgpu::CurrentSurfaceTexture::Suboptimal(output) => output,
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded => {
+                return RenderStatus::Skip;
+            }
+            wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+                return RenderStatus::Reconfigure;
+            }
+            wgpu::CurrentSurfaceTexture::Validation => {
+                return RenderStatus::Failed("surface validation error");
+            }
+        };
 
         let view = output
             .texture
@@ -164,7 +186,7 @@ impl Renderer {
                     view: depth_texture.get_view(),
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     }),
                     stencil_ops: None,
                 }),
@@ -175,13 +197,17 @@ impl Renderer {
                 label: None,
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
+                    depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(self.clear_color),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
             });
 
             app.render(&self, &mut render_pass);
@@ -190,6 +216,6 @@ impl Renderer {
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
 
-        Ok(())
+        RenderStatus::Rendered
     }
 }

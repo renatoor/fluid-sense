@@ -5,7 +5,7 @@ use std::time::Duration;
 use clap::Parser;
 use glam::Vec3;
 
-use winit::event::KeyboardInput;
+use winit::event::KeyEvent;
 
 use crate::app::App;
 use crate::cfd::sph::simulation::{SimulationParticle, SPH};
@@ -46,6 +46,8 @@ struct Args {
     config: String,
     #[arg(long, default_value_t = false)]
     headless: bool,
+    #[arg(long)]
+    steps: Option<usize>,
 }
 
 impl App for FluidSense {
@@ -86,7 +88,7 @@ impl App for FluidSense {
         }
     }
 
-    fn keyboard_input(&mut self, input: KeyboardInput) {
+    fn keyboard_input(&mut self, input: &KeyEvent) {
         self.camera_controller.keyboard_input(input);
     }
 
@@ -97,7 +99,7 @@ impl App for FluidSense {
     fn update(&mut self, dt: Duration) {
         self.camera_controller.update(&mut self.camera, dt);
         self.light.set_position(self.camera.position());
-        self.sph.step(0.001);
+        self.sph.step(self.sph.time_step());
         self.sph.check_particles(&self.world_map);
 
         self.world_map
@@ -138,14 +140,14 @@ impl App for FluidSense {
     }
 }
 
-fn run_headless() {
-    let args = Args::parse();
+fn run_headless(args: Args) {
     let config = cfd::config::Config::new(&args.config);
     let mut sph = SPH::new(&config);
     let mut world_map = WorldMap::new(&config);
+    let mut step_count = 0usize;
 
     loop {
-        sph.step(0.001);
+        sph.step(sph.time_step());
         sph.check_particles(&world_map);
 
         let dt = Duration::from_secs_f64(0.016);
@@ -169,6 +171,16 @@ fn run_headless() {
                 None => {}
             }
         });
+
+        step_count += 1;
+        if args.steps == Some(step_count) {
+            println!(
+                "Headless run completed: steps={}, particles={}",
+                step_count,
+                sph.get_particles().len()
+            );
+            break;
+        }
     }
 }
 
@@ -176,9 +188,8 @@ fn main() {
     let args = Args::parse();
 
     if args.headless {
-        run_headless();
+        run_headless(args);
     } else {
-        pollster::block_on(app::run::<FluidSense>());
+        app::run::<FluidSense>();
     }
 }
-

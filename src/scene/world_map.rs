@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use glam::{EulerRot, Quat, Vec3};
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
 
 use std::time::Duration;
 
@@ -114,20 +113,18 @@ impl Sensor {
     }
 
     pub fn inspect_particle(&self, particle: &SimulationParticle) {
-        println!(
+        log::debug!(
             "Sensor({}, {}, {}, {:?}) detected particle: {:?}",
-            self.label, self.position, self.range, self.output, particle
+            self.label,
+            self.position,
+            self.range,
+            self.output,
+            particle
         );
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct DeviceConfig {
-    actuators: Vec<ActuatorConfig>,
-    sensors: Vec<SensorConfig>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Tile {
     Empty,
     Wall,
@@ -251,27 +248,32 @@ impl WorldMap {
         self.sensors.get(label)
     }
 
-    pub fn get_tile_in_position(&self, position: Vec3) -> &Tile {
-        let (x, z) = ((position.x) as usize, (position.z) as usize);
+    pub fn get_tile_in_position(&self, position: Vec3) -> Tile {
+        if position.x < 0.0 || position.z < 0.0 {
+            return Tile::Empty;
+        }
 
-        if z <= self.tiles.len() && x <= self.tiles[z].len() {
-            let tile = &self.tiles[z][x];
+        let (x, z) = (position.x as usize, position.z as usize);
 
-            return match tile {
-                Tile::User => &Tile::Floor,
-                Tile::Device(_) => &Tile::Floor,
-                _ => tile,
+        if z < self.tiles.len() && x < self.tiles[z].len() {
+            return match self.tiles[z][x] {
+                Tile::User | Tile::Device(_) => Tile::Floor,
+                tile => tile,
             };
         }
 
-        return &Tile::Empty;
+        Tile::Empty
     }
 
     pub fn get_device_in_position(&self, position: Vec3) -> Option<char> {
-        let (x, z) = ((position.x) as usize, (position.z) as usize);
+        if position.x < 0.0 || position.z < 0.0 {
+            return None;
+        }
 
-        if z <= self.tiles.len() {
-            if x <= self.tiles[z].len() {
+        let (x, z) = (position.x as usize, position.z as usize);
+
+        if z < self.tiles.len() {
+            if x < self.tiles[z].len() {
                 let tile = &self.tiles[z][x];
 
                 return match tile {
@@ -281,7 +283,7 @@ impl WorldMap {
             }
         }
 
-        return None;
+        None
     }
 
     fn create_floor_instance(x: f32, z: f32) -> InstanceVertex {

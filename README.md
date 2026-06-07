@@ -9,5 +9,11 @@
 ```
 git clone https://github.com/GPMM/fluid-sense
 cd fluid-sense
-cargo run
+cargo run -- --config config.yml
+```
+
+Modo headless por uma quantidade finita de passos:
+
+```
+cargo run -- --config config.yml --headless --steps 300
 ```

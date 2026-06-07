@@ -44,7 +44,7 @@ impl VertexBuffer {
         }
     }
 
-    pub fn slice<S: RangeBounds<wgpu::BufferAddress>>(&self, bounds: S) -> wgpu::BufferSlice {
+    pub fn slice<S: RangeBounds<wgpu::BufferAddress>>(&self, bounds: S) -> wgpu::BufferSlice<'_> {
         self.buffer.slice(bounds)
     }
 
@@ -71,7 +71,7 @@ impl IndexBuffer {
         Self { buffer, len }
     }
 
-    pub fn slice<S: RangeBounds<wgpu::BufferAddress>>(&self, bounds: S) -> wgpu::BufferSlice {
+    pub fn slice<S: RangeBounds<wgpu::BufferAddress>>(&self, bounds: S) -> wgpu::BufferSlice<'_> {
         self.buffer.slice(bounds)
     }
 

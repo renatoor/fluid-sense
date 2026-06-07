@@ -8,23 +8,23 @@ environment: |
   #########
 actuators:
   a:
-    height: 1.5
+    height: 0.5
     direction: [-1.0, 0.0, 1.0]
-    initial_velocity: 5.0
+    initial_velocity: 8.0
     temperature: 25.0
     range: [0.2, 0.2, 0.2]
     fluid_type: Gaseous
-    interval: 0.05
+    interval: 0.0
     particle:
       size: 0.02
       color: [0.0, 0.0, 1.0]
   b:
-    height: 1.5
+    height: 0.5
     direction: [-1.0, 0.0, -1.0]
-    initial_velocity: 5.0
+    initial_velocity: 8.0
     range: [0.2, 0.2, 0.2]
     fluid_type: Gaseous
-    interval: 0.05
+    interval: 0.0
     particle:
       size: 0.02
       color: [1.0, 0.0, 0.0]
@@ -39,11 +39,12 @@ simulation:
   mass: 0.02
   gas_constant: 3.0
   rest_density: 0.99829
+  atmospheric_pressure: 1.0
   thermal_conductivity: 0.598
   small_positive: 0.0001
   viscosity: 0.01
-  damping_coefficient: 100.0
-  damping_threshold: 1.0
+  damping_coefficient: 2.0
+  damping_threshold: 10.0
   radiation_half_life: 1000.0
   buoyancy_coefficient: 0.8
   buoyancy_direction: [0.0, 1.0, 0.0]

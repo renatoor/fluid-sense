@@ -3,7 +3,8 @@ use crate::Camera;
 use glam::Vec3;
 use std::f32::consts::FRAC_PI_2;
 use std::time::Duration;
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
+use winit::event::{ElementState, KeyEvent};
+use winit::keyboard::{KeyCode, PhysicalKey};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
@@ -28,34 +29,21 @@ impl FirstPersonController {
         }
     }
 
-    pub fn keyboard_input(&mut self, input: KeyboardInput) {
-        match input {
-            KeyboardInput {
-                state: ElementState::Pressed,
-                virtual_keycode: Some(key),
-                ..
-            } => match key {
-                VirtualKeyCode::W => self.movement.0 = 1.0,
-                VirtualKeyCode::A => self.movement.1 = 1.0,
-                VirtualKeyCode::S => self.movement.2 = 1.0,
-                VirtualKeyCode::D => self.movement.3 = 1.0,
-                VirtualKeyCode::Space => self.movement.4 = 1.0,
-                VirtualKeyCode::LShift => self.movement.5 = 1.0,
-                _ => {}
-            },
-            KeyboardInput {
-                state: ElementState::Released,
-                virtual_keycode: Some(key),
-                ..
-            } => match key {
-                VirtualKeyCode::W => self.movement.0 = 0.0,
-                VirtualKeyCode::A => self.movement.1 = 0.0,
-                VirtualKeyCode::S => self.movement.2 = 0.0,
-                VirtualKeyCode::D => self.movement.3 = 0.0,
-                VirtualKeyCode::Space => self.movement.4 = 0.0,
-                VirtualKeyCode::LShift => self.movement.5 = 0.0,
-                _ => {}
-            },
+    pub fn keyboard_input(&mut self, input: &KeyEvent) {
+        let value = match input.state {
+            ElementState::Pressed => 1.0,
+            ElementState::Released => 0.0,
+        };
+
+        match input.physical_key {
+            PhysicalKey::Code(KeyCode::KeyW) => self.movement.0 = value,
+            PhysicalKey::Code(KeyCode::KeyA) => self.movement.1 = value,
+            PhysicalKey::Code(KeyCode::KeyS) => self.movement.2 = value,
+            PhysicalKey::Code(KeyCode::KeyD) => self.movement.3 = value,
+            PhysicalKey::Code(KeyCode::Space) => self.movement.4 = value,
+            PhysicalKey::Code(KeyCode::ShiftLeft | KeyCode::ShiftRight) => {
+                self.movement.5 = value;
+            }
             _ => {}
         }
     }

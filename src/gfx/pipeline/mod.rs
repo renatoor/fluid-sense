@@ -67,7 +67,8 @@ impl Pipeline {
         .map(|layout| renderer.create_bind_group_layout(layout))
         .collect();
 
-        let bind_group_layouts: Vec<&wgpu::BindGroupLayout> = layouts.iter().collect();
+        let bind_group_layouts: Vec<Option<&wgpu::BindGroupLayout>> =
+            layouts.iter().map(Some).collect();
 
         let pipeline_layout =
             renderer
@@ -75,7 +76,7 @@ impl Pipeline {
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: None,
                     bind_group_layouts: &bind_group_layouts,
-                    push_constant_ranges: &[],
+                    immediate_size: 0,
                 });
 
         renderer
@@ -85,15 +86,16 @@ impl Pipeline {
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: "vs_main",
+                    entry_point: Some("vs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[ModelVertex::desc(), InstanceVertex::desc()],
                 },
                 primitive: wgpu::PrimitiveState::default(),
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less, // 1.
-                    stencil: wgpu::StencilState::default(),     // 2.
+                    depth_write_enabled: Some(true),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
+                    stencil: wgpu::StencilState::default(), // 2.
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState {
@@ -103,14 +105,16 @@ impl Pipeline {
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
-                    entry_point: "fs_main",
+                    entry_point: Some("fs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: renderer.get_texture_format(),
                         blend: Some(wgpu::BlendState::REPLACE),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
                 }),
-                multiview: None,
+                multiview_mask: None,
+                cache: None,
             })
     }
 
@@ -136,7 +140,8 @@ impl Pipeline {
         .into_iter()
         .map(|layout| renderer.create_bind_group_layout(layout))
         .collect();
-        let bind_group_layouts: Vec<&wgpu::BindGroupLayout> = layouts.iter().collect();
+        let bind_group_layouts: Vec<Option<&wgpu::BindGroupLayout>> =
+            layouts.iter().map(Some).collect();
 
         let pipeline_layout =
             renderer
@@ -144,7 +149,7 @@ impl Pipeline {
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: None,
                     bind_group_layouts: &bind_group_layouts,
-                    push_constant_ranges: &[],
+                    immediate_size: 0,
                 });
 
         renderer
@@ -154,15 +159,16 @@ impl Pipeline {
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
-                    entry_point: "vs_main",
+                    entry_point: Some("vs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers: &[ParticleVertex::desc(), ParticleInstance::desc()],
                 },
                 primitive: wgpu::PrimitiveState::default(),
                 depth_stencil: Some(wgpu::DepthStencilState {
                     format: wgpu::TextureFormat::Depth32Float,
-                    depth_write_enabled: true,
-                    depth_compare: wgpu::CompareFunction::Less, // 1.
-                    stencil: wgpu::StencilState::default(),     // 2.
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::Less),
+                    stencil: wgpu::StencilState::default(), // 2.
                     bias: wgpu::DepthBiasState::default(),
                 }),
                 multisample: wgpu::MultisampleState {
@@ -172,14 +178,16 @@ impl Pipeline {
                 },
                 fragment: Some(wgpu::FragmentState {
                     module: &shader,
-                    entry_point: "fs_main",
+                    entry_point: Some("fs_main"),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(wgpu::ColorTargetState {
                         format: renderer.get_texture_format(),
-                        blend: Some(wgpu::BlendState::REPLACE),
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                         write_mask: wgpu::ColorWrites::ALL,
                     })],
                 }),
-                multiview: None,
+                multiview_mask: None,
+                cache: None,
             })
     }
 }

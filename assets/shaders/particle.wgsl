@@ -8,11 +8,11 @@ struct Camera {
 var<uniform> camera: Camera;
 
 struct VertexInput {
-    @location(0) position: vec3<f32>,
+    @location(0) vertex_position: vec3<f32>,
 };
 
 struct Instance {
-    @location(1) position: vec3<f32>,
+    @location(1) instance_position: vec3<f32>,
     @location(2) size: f32,
     @location(3) color: vec3<f32>,
 }
@@ -20,21 +20,29 @@ struct Instance {
 struct VertexOutput {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) color: vec3<f32>,
+    @location(1) quad_position: vec2<f32>,
 };
 
 @vertex
 fn vs_main(model: VertexInput, instance: Instance) -> VertexOutput {
     let camera_right: vec3<f32> = vec3<f32>(camera.view_matrix[0].x, camera.view_matrix[1].x, camera.view_matrix[2].x);
     let camera_up: vec3<f32> = vec3<f32>(camera.view_matrix[0].y, camera.view_matrix[1].y, camera.view_matrix[2].y);
-    let position_world: vec3<f32> = instance.position + camera_right * model.position.x * instance.size + camera_up * model.position.y * instance.size;
+    let position_world: vec3<f32> = instance.instance_position + camera_right * model.vertex_position.x * instance.size + camera_up * model.vertex_position.y * instance.size;
     var out: VertexOutput;
     var screenspace: vec4<f32> = camera.view_projection * vec4<f32>(position_world, 1.0);
     out.clip_position = screenspace;
     out.color = instance.color;
+    out.quad_position = model.vertex_position.xy;
     return out;
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-    return vec4<f32>(in.color, 1.0);
+    let distance = length(in.quad_position);
+    if distance > 1.0 {
+        discard;
+    }
+
+    let alpha = (1.0 - smoothstep(0.35, 1.0, distance)) * 0.45;
+    return vec4<f32>(in.color, alpha);
 }

@@ -39,12 +39,20 @@ impl Mesh {
         render_pass: &mut wgpu::RenderPass<'a>,
         instance_buffer: &'a VertexBuffer,
     ) {
+        if self.vertex_buffer.len() == 0 || instance_buffer.len() == 0 {
+            return;
+        }
+
         self.texture.bind(render_pass);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_vertex_buffer(1, instance_buffer.slice(..));
 
         match &self.index_buffer {
             Some(index_buffer) => {
+                if index_buffer.len() == 0 {
+                    return;
+                }
+
                 render_pass.set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
                 render_pass.draw_indexed(0..index_buffer.len(), 0, 0..instance_buffer.len());
             }
