@@ -73,13 +73,16 @@ impl Spiky {
 
 impl Viscosity {
     pub fn new(radius: f32) -> Self {
-        Self { radius, l: 10.0 }
+        Self {
+            radius,
+            l: 45.0 / (PI * radius.powf(6.0)),
+        }
     }
 
     pub fn laplacian_w(&self, r: Vec3) -> f32 {
         let rl = r.length();
 
-        self.l * (self.radius * rl)
+        self.l * (self.radius - rl)
     }
 }
 

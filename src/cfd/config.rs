@@ -5,10 +5,12 @@ use strum_macros::EnumString;
 
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct SimulationConfig {
+    pub step: f32,
     pub radius: f32,
     pub mass: f32,
     pub gas_constant: f32,
     pub rest_density: f32,
+    pub atmospheric_pressure: f32,
     pub thermal_conductivity: f32,
     pub small_positive: f32,
     pub viscosity: f32,

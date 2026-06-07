@@ -12,6 +12,8 @@ pub struct SimulationParticle {
     forces: Vec3,
     density: f32,
     density_correction: f32,
+    normal: Vec3,
+    virtual_volume: f32,
     temperature: f32,
     fluid_type: FluidType,
     size: f32,
@@ -34,6 +36,8 @@ impl SimulationParticle {
             forces: Vec3::ZERO,
             density: 0.0,
             density_correction: 0.0,
+            normal: Vec3::ZERO,
+            virtual_volume: 0.0,
             temperature,
             fluid_type,
             size,
@@ -85,6 +89,10 @@ impl SPH {
         &self.particles
     }
 
+    pub fn time_step(&self) -> f32 {
+        self.config.step
+    }
+
     pub fn check_particles(&mut self, world_map: &WorldMap) {
         self.particles
             .iter()
@@ -109,7 +117,7 @@ impl SPH {
     pub fn step(&mut self, time_step: f32) {
         self.compute_uncorrected_densities();
         self.compute_densities();
-        self.compute_forces();
+        self.compute_forces(time_step);
         self.integrate(time_step);
     }
 
@@ -118,13 +126,12 @@ impl SPH {
             let (before, nonbefore) = self.particles.split_at_mut(i);
             let (pi, after) = nonbefore.split_first_mut().unwrap();
 
-            pi.density = self.kernel.w0();
+            pi.density = self.config.mass * self.kernel.w0();
+            pi.density_correction = pi.density;
+            pi.normal = Vec3::ZERO;
+            pi.virtual_volume = 0.0;
 
             for pj in before.iter().chain(after.iter()) {
-                if pi.fluid_type != pj.fluid_type {
-                    continue;
-                }
-
                 let diff = pi.position - pj.position;
                 let r = diff.length();
 
@@ -138,16 +145,17 @@ impl SPH {
     fn compute_densities(&mut self) {
         for i in 0..self.particles.len() {
             if self.particles[i].fluid_type == FluidType::Liquid {
+                self.particles[i].density_correction = self.particles[i].density;
                 continue;
             }
 
             let (before, nonbefore) = self.particles.split_at_mut(i);
             let (pi, after) = nonbefore.split_first_mut().unwrap();
 
-            let mut density = Vec3::ZERO;
+            let mut normal = Vec3::ZERO;
 
             for pj in before.iter().chain(after.iter()) {
-                if pj.fluid_type == FluidType::Liquid {
+                if pj.fluid_type != FluidType::Gaseous {
                     continue;
                 }
 
@@ -155,77 +163,64 @@ impl SPH {
                 let r = diff.length();
 
                 if r > 0.0 && r <= self.config.radius {
-                    density -= self.config.mass / pj.density * self.kernel.poly6_grad_w(diff);
+                    normal += self.config.mass / pj.density * self.kernel.poly6_grad_w(diff);
                 }
             }
 
-            let v0 = density.length()
-                / self
-                    .kernel
-                    .poly6_grad_w(self.config.virtual_particle)
-                    .length();
+            let virtual_gradient = self
+                .kernel
+                .poly6_grad_w(self.config.virtual_particle)
+                .length();
+            let v0 = if virtual_gradient > 0.0 {
+                normal.length() / virtual_gradient
+            } else {
+                0.0
+            };
+            pi.normal = normal;
+            pi.virtual_volume = v0;
             pi.density_correction =
                 pi.density * (1.0 + v0 * self.kernel.w(self.config.virtual_particle));
         }
     }
 
-    fn compute_forces(&mut self) {
+    fn compute_forces(&mut self, time_step: f32) {
         for i in 0..self.particles.len() {
             let (before, nonbefore) = self.particles.split_at_mut(i);
             let (pi, after) = nonbefore.split_first_mut().unwrap();
 
+            let density_i = pi.density_correction;
             let mut damping = Vec3::ZERO;
-            let mut atmospheric_pressure = Vec3::ZERO;
             let mut pressure = Vec3::ZERO;
             let mut viscosity = Vec3::ZERO;
             let mut temperature = 0.0f32;
+            let mut gas_normal = Vec3::ZERO;
 
             for pj in before.iter().chain(after.iter()) {
-                if pi.fluid_type != pj.fluid_type {
+                let diff = pi.position - pj.position;
+                let r2 = diff.dot(diff);
+                let r = r2.sqrt();
+
+                if r <= 0.0 || r > self.config.radius {
                     continue;
                 }
 
-                let pressure_i = self.config.gas_constant * (pi.density - self.config.rest_density);
-                let pressure_j = self.config.gas_constant * (pj.density - self.config.rest_density);
-                let pressure_k =
-                    self.config.gas_constant * (pi.density_correction - self.config.rest_density);
+                let density_j = pj.density_correction;
+                let pressure_i = self.config.gas_constant * (density_i - self.config.rest_density);
+                let pressure_j = self.config.gas_constant * (density_j - self.config.rest_density);
+                let gradient = self.kernel.spiky_grad_w(diff);
 
-                let diff = pi.position - pj.position;
-                let r = diff.dot(diff);
+                pressure -=
+                    (self.config.mass / density_j) * ((pressure_i + pressure_j) / 2.0) * gradient;
 
-                if r > 0.0 && r <= self.config.radius {
-                    match pi.fluid_type {
-                        FluidType::Gaseous => {
-                            atmospheric_pressure +=
-                                (self.config.mass / pressure_j) * self.kernel.spiky_grad_w(diff);
+                viscosity += self.config.mass * (pj.velocity - pi.velocity) / density_j
+                    * self.kernel.viscosity_laplacian_w(diff);
 
-                            pressure -= (self.config.mass / pj.density)
-                                * ((pressure_i + pressure_j) / 2.0)
-                                * self.kernel.spiky_grad_w(diff)
-                                + (self.config.mass / pi.density_correction)
-                                    * ((pressure_i + pressure_k) / 2.0)
-                                    * self.kernel.spiky_grad_w(self.config.virtual_particle);
-
-                            viscosity += self.config.mass * (pj.velocity - pi.velocity)
-                                / pj.density
-                                * self.kernel.viscosity_laplacian_w(diff);
-
-                            temperature += (self.config.mass / (pressure_i * pressure_j))
-                                * self.config.thermal_conductivity
-                                * (pi.temperature - pj.temperature)
-                                * (diff.dot(self.kernel.spiky_grad_w(diff))
-                                    / (diff.dot(diff) + self.config.small_positive));
-                        }
-                        FluidType::Liquid => {
-                            pressure -= (self.config.mass / pj.density)
-                                * ((pressure_i + pressure_j) / 2.0)
-                                * self.kernel.spiky_grad_w(diff);
-
-                            viscosity += self.config.mass * (pj.velocity - pi.velocity)
-                                / pj.density
-                                * self.kernel.viscosity_laplacian_w(diff);
-                        }
-                    }
+                if pi.fluid_type == FluidType::Gaseous && pj.fluid_type == FluidType::Gaseous {
+                    gas_normal += self.config.mass / density_j * self.kernel.poly6_grad_w(diff);
+                    temperature += (self.config.mass / (density_i * density_j))
+                        * self.config.thermal_conductivity
+                        * (pi.temperature - pj.temperature)
+                        * (diff.dot(gradient) / (r2 + self.config.small_positive));
                 }
             }
 
@@ -233,23 +228,57 @@ impl SPH {
 
             match pi.fluid_type {
                 FluidType::Gaseous => {
-                    if atmospheric_pressure.length() > self.config.damping_threshold {
-                        temperature -= pi.temperature / self.config.radiation_half_life;
-                        damping = -self.config.damping_coefficient * pi.velocity;
+                    if gas_normal.length() > 0.0 {
+                        pi.normal = gas_normal;
+                    }
+                    let pressure_i =
+                        self.config.gas_constant * (density_i - self.config.rest_density);
+                    let pressure_k = pressure_i;
+                    let virtual_particle = if pi.normal.length() > 0.0 {
+                        pi.normal.normalize() * self.config.virtual_particle.length()
+                    } else {
+                        self.config.virtual_particle
+                    };
+                    let virtual_weight = self.kernel.w(virtual_particle);
+                    let virtual_volume = if 1.0 + pi.virtual_volume * virtual_weight > 0.0 {
+                        pi.virtual_volume / (1.0 + pi.virtual_volume * virtual_weight)
+                    } else {
+                        0.0
+                    };
+
+                    pressure -= virtual_volume
+                        * ((pressure_i + pressure_k) / 2.0)
+                        * self.kernel.spiky_grad_w(virtual_particle);
+
+                    let atmospheric_pressure = self.config.atmospheric_pressure * pi.normal;
+
+                    let normal_length = pi.normal.length();
+                    if normal_length > self.config.damping_threshold {
+                        let boundary_factor = if self.config.damping_threshold > 0.0 {
+                            ((normal_length - self.config.damping_threshold)
+                                / self.config.damping_threshold)
+                                .clamp(0.0, 1.0)
+                        } else {
+                            1.0
+                        };
+
+                        temperature -=
+                            boundary_factor * pi.temperature / self.config.radiation_half_life;
+                        damping = -boundary_factor * self.config.damping_coefficient * pi.velocity;
                     }
 
-                    pi.temperature += temperature;
+                    pi.temperature += temperature * time_step;
 
                     let buoyancy = self.config.buoyancy_coefficient
                         * pi.temperature
                         * self.config.buoyancy_direction;
 
-                    pi.forces = (pressure + 1.0 * atmospheric_pressure)
+                    pi.forces = (pressure + atmospheric_pressure)
                         + viscosity
-                        + pi.density * (self.config.gravity + buoyancy + damping);
+                        + density_i * (self.config.gravity + buoyancy + damping);
                 }
                 FluidType::Liquid => {
-                    pi.forces = pressure + viscosity + pi.density * self.config.gravity;
+                    pi.forces = pressure + viscosity + density_i * self.config.gravity;
                 }
             }
         }
@@ -260,9 +289,8 @@ impl SPH {
             let prev_acceleration = particle.acceleration;
             let prev_velocity = particle.velocity;
 
-            particle.acceleration = particle.forces / particle.density;
-            particle.velocity +=
-                (prev_acceleration + particle.acceleration) / 2.0 * time_step * time_step;
+            particle.acceleration = particle.forces / particle.density_correction;
+            particle.velocity += (prev_acceleration + particle.acceleration) / 2.0 * time_step;
             particle.position +=
                 prev_velocity * time_step + prev_acceleration / 2.0 * time_step * time_step;
 
